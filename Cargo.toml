@@ -9,3 +9,6 @@ edition = "2018"
 rust-crypto = "0.2.36"
 chrono = "0.4.19"
 openssl = "0.10.35"
+k256 = { version = "0.9.6", features = ["ecdsa"] }
+rand_core = "0.6.3"
+elliptic-curve = { version = "0.10.5", features = ["jwk"]}

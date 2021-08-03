@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use core::fmt;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use openssl::hash::MessageDigest;
@@ -49,7 +50,7 @@ struct BlockBuilder {
     pub timestamp: Option<DateTime<Utc>>,
     pub payload: Option<String>,
     pub address: Option<String>,
-    pub signature: Option<String>,
+    pub signature: Option<Key>,
 }
 
 impl BlockBuilder {
@@ -93,7 +94,6 @@ impl BlockBuilder {
             self.payload.as_ref().unwrap(),
             self.previous_hash
         );
-
         self.signature = Some(acc.sign_data(data));
         self
     }
@@ -116,7 +116,7 @@ struct Block {
     pub timestamp: String,
     pub payload: String,
     pub address: String,
-    pub signature: String,
+    pub signature: Key,
 }
 
 impl Block {
@@ -125,12 +125,12 @@ impl Block {
         timestamp: DateTime<Utc>,
         previous_hash: &Option<BlockHash>,
         address: &str,
-        signature: &str,
+        signature: &Key,
     ) -> Self {
         let timestamp = timestamp.to_string();
         let payload = payload.to_string();
         let address = address.to_string();
-        let signature = signature.to_string();
+        let signature = signature.clone();
         let previous_hash = previous_hash.clone();
         Self {
             hash: BlockHash::new(
@@ -145,6 +145,16 @@ impl Block {
             address,
             signature,
         }
+    }
+
+    pub fn verify_sign_with(&mut self, acc: &SignedInfo) -> bool {
+        // Terribly ugly, I know
+        let data = format!(
+            "{}{}{}{:?}",
+            self.address, self.timestamp, self.payload, self.previous_hash
+        );
+
+        acc.verify_signature(&self.signature, data)
     }
 }
 
@@ -191,6 +201,33 @@ impl Blockchain {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Key(Vec<u8>);
+
+#[allow(dead_code)]
+impl Key {
+    pub fn hash_it(&self) -> String {
+        let str_key = self.to_string();
+        let mut hasher = Sha1::new();
+        hasher.input_str(&str_key);
+        hasher.result_str()
+    }
+}
+
+impl std::fmt::Display for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
+    }
+}
+
 struct SignedInfo {
     pub keypair: PKey<Private>,
 }
@@ -203,47 +240,39 @@ impl SignedInfo {
         Self { keypair }
     }
 
-    pub fn sign_data(&self, data: String) -> String {
+    pub fn sign_data(&self, data: String) -> Key {
         let data = data.as_bytes();
 
         let mut signer = Signer::new(MessageDigest::sha256(), &self.keypair).unwrap();
         signer.update(data).unwrap();
         let signature = signer.sign_to_vec().unwrap();
 
-        signature
-            .iter()
-            .map(|n| n.to_string())
-            .collect::<Vec<String>>()
-            .join(" ")
+        Key(signature)
     }
-    /*
-    pub fn verify_signature(&self, signature: Vec<u8>) -> bool {
+    pub fn verify_signature(&self, signature: &Key, data: String) -> bool {
         let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
-        verifier.update(&self.data.as_bytes()).unwrap();
-        verifier.verify(&signature).is_ok()
+        verifier.update(data.as_bytes()).unwrap();
+        verifier.verify(&signature.0).unwrap()
     }
-    */
-    pub fn get_public(&self) -> String {
+
+    pub fn get_public(&self) -> Key {
         let public_key = self.keypair.public_key_to_pem().unwrap();
-        let public_key = String::from_utf8(public_key).unwrap();
-        let mut hasher = Sha1::new();
-        hasher.input_str(&public_key);
-        return hasher.result_str();
+        Key(public_key)
     }
 }
 
 fn main() {
     let mut blockchain = Blockchain::new();
 
-    let account = SignedInfo::new();
-    let public_address = account.get_public();
+    let account_a = SignedInfo::new();
+    let public_address = account_a.get_public().to_string();
 
     blockchain.add_block(
         BlockBuilder::new()
             .payload("Block 1")
             .timestamp(Utc::now())
             .address(&public_address)
-            .sign_with(&account)
+            .sign_with(&account_a)
             .build(),
     );
 
@@ -253,9 +282,22 @@ fn main() {
             .timestamp(Utc::now())
             .previous_hash(&blockchain.peek().unwrap().hash)
             .address(&public_address)
-            .sign_with(&account)
+            .sign_with(&account_a)
             .build(),
     );
+
+    let mut block_3 = BlockBuilder::new()
+        .payload("Block 1")
+        .timestamp(Utc::now())
+        .address(&public_address)
+        .sign_with(&account_a)
+        .build();
+
+    // Verifying the signing on the block should fail since this account hasn't signed it
+    let account_b = SignedInfo::new();
+
+    assert!(block_3.verify_sign_with(&account_a));
+    assert!(!block_3.verify_sign_with(&account_b));
 
     for (block_hash, block) in blockchain.iter() {
         let hash = &block_hash.hash;
