@@ -3,11 +3,9 @@ use core::fmt;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use openssl::hash::MessageDigest;
-use openssl::pkey::{PKey, Private};
+use openssl::pkey::{PKey, Private, Public};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
-use std::collections::hash_map;
-use std::collections::HashMap;
 use std::hash::Hash;
 
 static HASH_VERSION: u8 = 1;
@@ -23,14 +21,14 @@ impl BlockHash {
         payload: String,
         timestamp: String,
         previous_hash: Option<BlockHash>,
-        address: String,
+        key: Key,
     ) -> Self {
         let mut hasher = Sha1::new();
 
         hasher.input_str(&HASH_VERSION.to_string());
         hasher.input_str(&payload);
         hasher.input_str(&timestamp);
-        hasher.input_str(&address);
+        hasher.input_str(&key.to_string());
 
         if let Some(previous_hash) = previous_hash {
             hasher.input_str(&previous_hash.hash);
@@ -49,7 +47,7 @@ struct BlockBuilder {
     pub previous_hash: Option<BlockHash>,
     pub timestamp: Option<DateTime<Utc>>,
     pub payload: Option<String>,
-    pub address: Option<String>,
+    pub key: Option<Key>,
     pub signature: Option<Key>,
 }
 
@@ -60,7 +58,7 @@ impl BlockBuilder {
             previous_hash: None,
             timestamp: None,
             payload: None,
-            address: None,
+            key: None,
             signature: None,
         }
     }
@@ -80,16 +78,16 @@ impl BlockBuilder {
         self
     }
 
-    pub fn address(&mut self, address: &str) -> &mut Self {
-        self.address = Some(address.to_string());
+    pub fn key(&mut self, key: &Key) -> &mut Self {
+        self.key = Some(key.clone());
         self
     }
 
-    pub fn sign_with(&mut self, acc: &SignedInfo) -> &mut Self {
+    pub fn sign_with(&mut self, acc: &Wallet) -> &mut Self {
         // Terribly ugly, I know
         let data = format!(
             "{}{}{}{:?}",
-            self.address.as_ref().unwrap(),
+            self.key.as_ref().unwrap(),
             self.timestamp.as_ref().unwrap(),
             self.payload.as_ref().unwrap(),
             self.previous_hash
@@ -103,10 +101,14 @@ impl BlockBuilder {
             &self.payload.as_ref().unwrap(),
             self.timestamp.unwrap(),
             &self.previous_hash,
-            &self.address.as_ref().unwrap(),
+            &self.key.as_ref().unwrap(),
             &self.signature.as_ref().unwrap(),
         )
     }
+}
+
+trait SignVerifier {
+    fn verify_signature(&self, signature: &Key, data: String) -> bool;
 }
 
 #[derive(Clone, Debug)]
@@ -115,7 +117,7 @@ struct Block {
     pub previous_hash: Option<BlockHash>,
     pub timestamp: String,
     pub payload: String,
-    pub address: String,
+    pub key: Key,
     pub signature: Key,
 }
 
@@ -124,12 +126,11 @@ impl Block {
         payload: &str,
         timestamp: DateTime<Utc>,
         previous_hash: &Option<BlockHash>,
-        address: &str,
+        key: &Key,
         signature: &Key,
     ) -> Self {
         let timestamp = timestamp.to_string();
         let payload = payload.to_string();
-        let address = address.to_string();
         let signature = signature.clone();
         let previous_hash = previous_hash.clone();
         Self {
@@ -137,21 +138,21 @@ impl Block {
                 payload.clone(),
                 timestamp.clone(),
                 previous_hash.clone(),
-                address.clone(),
+                key.clone(),
             ),
             timestamp,
             payload,
             previous_hash,
-            address,
+            key: key.clone(),
             signature,
         }
     }
 
-    pub fn verify_sign_with(&mut self, acc: &SignedInfo) -> bool {
+    pub fn verify_sign_with(&self, acc: &impl SignVerifier) -> bool {
         // Terribly ugly, I know
         let data = format!(
             "{}{}{}{:?}",
-            self.address, self.timestamp, self.payload, self.previous_hash
+            self.key, self.timestamp, self.payload, self.previous_hash
         );
 
         acc.verify_signature(&self.signature, data)
@@ -159,15 +160,21 @@ impl Block {
 }
 
 struct Blockchain {
-    pub chain: HashMap<BlockHash, Block>,
+    pub chain: Vec<Block>,
     pub index: u64,
     pub last_block_hash: Option<BlockHash>,
+}
+
+#[derive(Debug)]
+enum BlockchainIntegrityErrors {
+    InvalidPrevioushHash(String, String),
+    InvalidSignature,
 }
 
 impl Blockchain {
     pub fn new() -> Self {
         Self {
-            chain: HashMap::new(),
+            chain: Vec::new(),
             index: 0,
             last_block_hash: None,
         }
@@ -176,16 +183,16 @@ impl Blockchain {
     /*
      * Append a block to the chain
      */
-    pub fn add_block(&mut self, block: Block) {
-        self.chain.insert(block.hash.clone(), block.clone());
+    pub fn add_block(&mut self, block: &Block) {
+        self.chain.push(block.clone());
         self.index += 1;
-        self.last_block_hash = Some(block.hash);
+        self.last_block_hash = Some(block.hash.clone());
     }
 
     /*
      * Return HashMap's iterator
      */
-    pub fn iter(&self) -> hash_map::Iter<BlockHash, Block> {
+    pub fn iter(&self) -> std::slice::Iter<Block> {
         self.chain.iter()
     }
 
@@ -193,11 +200,42 @@ impl Blockchain {
      * Return the last block's hash if there is
      */
     pub fn peek(&self) -> Option<&Block> {
-        if let Some(last_block_hash) = &self.last_block_hash {
-            self.chain.get(&last_block_hash)
-        } else {
-            None
+        self.chain.last()
+    }
+
+    /*
+     * Verify the integrity of the blockchain
+     */
+    pub fn verify_integrity(&self) -> Result<(), BlockchainIntegrityErrors> {
+        for (i, block) in self.chain.iter().enumerate() {
+            if i > 0 {
+                let previous_block = &self.chain[i - 1];
+
+                /*
+                 * The previous hash must be the same as the previous block's hash
+                 */
+                let previous_hash = block.previous_hash.as_ref().unwrap();
+                if previous_hash != &previous_block.hash {
+                    return Err(BlockchainIntegrityErrors::InvalidPrevioushHash(
+                        previous_hash.hash.clone(),
+                        previous_block.hash.hash.clone(),
+                    ));
+                }
+            }
+
+            let block_signer = PublicAddress {
+                keypair: PKey::from_rsa(Rsa::public_key_from_pem(block.key.0.as_slice()).unwrap())
+                    .unwrap(),
+            };
+
+            /*
+             * The signature must be correct according the public key and the block data
+             */
+            if !block.verify_sign_with(&block_signer) {
+                return Err(BlockchainIntegrityErrors::InvalidSignature);
+            }
         }
+        Ok(())
     }
 }
 
@@ -228,11 +266,19 @@ impl std::fmt::Display for Key {
     }
 }
 
-struct SignedInfo {
+struct Wallet {
     pub keypair: PKey<Private>,
 }
 
-impl SignedInfo {
+impl SignVerifier for Wallet {
+    fn verify_signature(&self, signature: &Key, data: String) -> bool {
+        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
+        verifier.update(data.as_bytes()).unwrap();
+        verifier.verify(&signature.0).unwrap()
+    }
+}
+
+impl Wallet {
     pub fn new() -> Self {
         let keypair = Rsa::generate(515).unwrap();
         let keypair = PKey::from_rsa(keypair).unwrap();
@@ -249,11 +295,6 @@ impl SignedInfo {
 
         Key(signature)
     }
-    pub fn verify_signature(&self, signature: &Key, data: String) -> bool {
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
-        verifier.update(data.as_bytes()).unwrap();
-        verifier.verify(&signature.0).unwrap()
-    }
 
     pub fn get_public(&self) -> Key {
         let public_key = self.keypair.public_key_to_pem().unwrap();
@@ -261,55 +302,80 @@ impl SignedInfo {
     }
 }
 
+struct PublicAddress {
+    keypair: PKey<Public>,
+}
+
+impl SignVerifier for PublicAddress {
+    fn verify_signature(&self, signature: &Key, data: String) -> bool {
+        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
+        verifier.update(data.as_bytes()).unwrap();
+        verifier.verify(&signature.0).unwrap()
+    }
+}
+
 fn main() {
     let mut blockchain = Blockchain::new();
 
-    let account_a = SignedInfo::new();
-    let public_address = account_a.get_public().to_string();
+    let account_a = Wallet::new();
+    let public_key = account_a.get_public();
 
     blockchain.add_block(
-        BlockBuilder::new()
+        &BlockBuilder::new()
             .payload("Block 1")
             .timestamp(Utc::now())
-            .address(&public_address)
+            .key(&public_key)
             .sign_with(&account_a)
             .build(),
     );
 
-    blockchain.add_block(
-        BlockBuilder::new()
-            .payload("Block 2")
-            .timestamp(Utc::now())
-            .previous_hash(&blockchain.peek().unwrap().hash)
-            .address(&public_address)
-            .sign_with(&account_a)
-            .build(),
-    );
+    for i in 0..99 {
+        blockchain.add_block(
+            &BlockBuilder::new()
+                .payload(&format!("Block {:?}", i))
+                .timestamp(Utc::now())
+                .previous_hash(&blockchain.peek().unwrap().hash)
+                .key(&public_key)
+                .sign_with(&account_a)
+                .build(),
+        );
+    }
 
-    let mut block_3 = BlockBuilder::new()
+    let block_3 = BlockBuilder::new()
         .payload("Block 1")
         .timestamp(Utc::now())
-        .address(&public_address)
+        .key(&public_key)
         .sign_with(&account_a)
         .build();
 
     // Verifying the signing on the block should fail since this account hasn't signed it
-    let account_b = SignedInfo::new();
+    let account_b = Wallet::new();
 
     assert!(block_3.verify_sign_with(&account_a));
     assert!(!block_3.verify_sign_with(&account_b));
 
-    for (block_hash, block) in blockchain.iter() {
-        let hash = &block_hash.hash;
+    for block in blockchain.iter() {
+        let hash = &block.hash.hash;
         let timestamp = &block.timestamp;
-        let address = &block.address;
+        let key = &block.key;
         println!(
-            "[{hash}] - {timestamp} - made by {address}",
+            "[{hash}] - {timestamp} - made by {key}",
             hash = hash,
             timestamp = timestamp,
-            address = address
+            key = key.hash_it()
         );
     }
+
+    assert!(blockchain.verify_integrity().is_ok());
+
+    let public_account_a = PublicAddress {
+        keypair: PKey::from_rsa(
+            Rsa::public_key_from_pem(account_a.get_public().0.as_slice()).unwrap(),
+        )
+        .unwrap(),
+    };
+
+    assert!(block_3.verify_sign_with(&public_account_a));
 
     println!(
         "\nLast block hash is {:?}",
