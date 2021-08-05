@@ -6,11 +6,13 @@ use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Private, Public};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
 static HASH_VERSION: u8 = 1;
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 struct BlockHash {
     hash: String,
     version: u8,
@@ -111,7 +113,7 @@ trait SignVerifier {
     fn verify_signature(&self, signature: &Key, data: String) -> bool;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Block {
     pub hash: BlockHash,
     pub previous_hash: Option<BlockHash>,
@@ -163,20 +165,24 @@ struct Blockchain {
     pub chain: Vec<Block>,
     pub index: u64,
     pub last_block_hash: Option<BlockHash>,
+    pub config: Arc<Mutex<Configuration>>,
 }
 
 #[derive(Debug)]
-enum BlockchainIntegrityErrors {
+enum BlockchainErrors {
     InvalidPrevioushHash(String, String),
     InvalidSignature,
+    CouldntLoadBlock(String),
+    CouldntAddBlock(String),
 }
 
 impl Blockchain {
-    pub fn new() -> Self {
+    pub fn new(config: Arc<Mutex<Configuration>>) -> Self {
         Self {
             chain: Vec::new(),
             index: 0,
             last_block_hash: None,
+            config,
         }
     }
 
@@ -184,9 +190,16 @@ impl Blockchain {
      * Append a block to the chain
      */
     pub fn add_block(&mut self, block: &Block) {
-        self.chain.push(block.clone());
-        self.index += 1;
-        self.last_block_hash = Some(block.hash.clone());
+        let db_result = self.config.lock().unwrap().add_block(&block);
+
+        if db_result.is_ok() {
+            self.chain.push(block.clone());
+            self.index += 1;
+            self.last_block_hash = Some(block.hash.clone());
+        } else {
+            // WIP
+            println!("error");
+        }
     }
 
     /*
@@ -206,7 +219,7 @@ impl Blockchain {
     /*
      * Verify the integrity of the blockchain
      */
-    pub fn verify_integrity(&self) -> Result<(), BlockchainIntegrityErrors> {
+    pub fn verify_integrity(&self) -> Result<(), BlockchainErrors> {
         for (i, block) in self.chain.iter().enumerate() {
             if i > 0 {
                 let previous_block = &self.chain[i - 1];
@@ -216,7 +229,7 @@ impl Blockchain {
                  */
                 let previous_hash = block.previous_hash.as_ref().unwrap();
                 if previous_hash != &previous_block.hash {
-                    return Err(BlockchainIntegrityErrors::InvalidPrevioushHash(
+                    return Err(BlockchainErrors::InvalidPrevioushHash(
                         previous_hash.hash.clone(),
                         previous_block.hash.hash.clone(),
                     ));
@@ -232,14 +245,14 @@ impl Blockchain {
              * The signature must be correct according the public key and the block data
              */
             if !block.verify_sign_with(&block_signer) {
-                return Err(BlockchainIntegrityErrors::InvalidSignature);
+                return Err(BlockchainErrors::InvalidSignature);
             }
         }
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Key(Vec<u8>);
 
 #[allow(dead_code)]
@@ -315,7 +328,13 @@ impl SignVerifier for PublicAddress {
 }
 
 fn main() {
-    let mut blockchain = Blockchain::new();
+    let config = Configuration::new();
+
+    assert!(config.get_blocks().is_ok());
+
+    let conf = Arc::new(Mutex::new(config));
+
+    let mut blockchain = Blockchain::new(conf);
 
     let account_a = Wallet::new();
     let public_key = account_a.get_public();
@@ -381,4 +400,71 @@ fn main() {
         "\nLast block hash is {:?}",
         blockchain.peek().unwrap().hash.hash
     );
+}
+
+struct Configuration {
+    db: sled::Db,
+}
+
+impl Configuration {
+    pub fn new() -> Self {
+        let db = sled::open("db").unwrap();
+        Self { db }
+    }
+
+    /*
+     * Get all the blocks on the blockchain
+     */
+    pub fn get_blocks(&self) -> Result<Vec<Block>, BlockchainErrors> {
+        let mut chain = Vec::new();
+
+        // Blocks tree
+        let blocks: sled::Tree = self.db.open_tree(b"blocks").unwrap();
+
+        // Get the first and the last block's hash
+        if let (Some((first_hash, _)), Some((last_hash, _))) =
+            (blocks.first().unwrap(), blocks.last().unwrap())
+        {
+            // Get a range between the first and the last block (all blocks)
+            let all_blocks = blocks.range(first_hash..last_hash);
+
+            for block in all_blocks {
+                let (block_hash, block) = block.unwrap();
+
+                // Stringified block
+                let block_info = String::from_utf8(block.to_vec()).unwrap();
+
+                // Block serialized
+                if let Ok(block) = serde_json::from_str(&block_info) {
+                    let block: Block = block;
+                    println!("Loaded block {}", &block.hash.hash);
+                    chain.push(block);
+                } else {
+                    return Err(BlockchainErrors::CouldntLoadBlock(
+                        String::from_utf8(block_hash.to_vec()).unwrap(),
+                    ));
+                }
+            }
+        }
+
+        Ok(chain)
+    }
+
+    /*
+     * Add a block to the database
+     */
+    pub fn add_block(&mut self, block: &Block) -> Result<(), BlockchainErrors> {
+        let blocks: sled::Tree = self.db.open_tree(b"blocks").unwrap();
+
+        let result = blocks.insert(
+            &block.hash.hash,
+            serde_json::to_string(&block).unwrap().as_bytes(),
+        );
+
+        if result.is_ok() {
+            Ok(())
+        } else {
+            Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))
+        }
+    }
 }
