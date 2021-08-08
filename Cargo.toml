@@ -5,12 +5,15 @@ edition = "2018"
 
 [dependencies]
 blockchain = { path="./blockchain"}
+node = { path="./node"}
 chrono = "0.4.19"
 openssl = "0.10.35"
 rust-crypto = "0.2.36"
+tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}
 
 [workspace]
 members = [
     "node",
-    "blockchain"
+    "blockchain",
+    "client"
 ]

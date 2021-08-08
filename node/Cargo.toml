@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+blockchain = { path = "../blockchain"}
 actix-web = "3.3.2"
 serde_derive = "1.0.126"
 serde = { version = "1.0.127", features = ["derive"] }
+jsonrpc-http-server = "18.0.0"
+futures = "0.3.16"
+tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}
 
 [dev-dependencies]
 actix-rt = "2.2.0"

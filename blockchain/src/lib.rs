@@ -377,6 +377,7 @@ pub struct BlockchainConfig {
     name: String,
 }
 
+#[derive(Clone)]
 pub struct Configuration {
     db: sled::Db,
 }

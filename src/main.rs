@@ -16,8 +16,13 @@ use blockchain::{
     Wallet,
 };
 
-fn main() {
+use node::start_node;
+
+#[tokio::main]
+async fn main() {
     let config = Arc::new(Mutex::new(Configuration::new()));
+
+    start_node(config.clone());
 
     let mut blockchain = Blockchain::new("mars", config);
 
