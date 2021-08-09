@@ -1,9 +1,6 @@
 use chrono::prelude::*;
 use core::fmt;
-use crypto::{
-    digest::Digest,
-    sha1::Sha1,
-};
+use crypto::{digest::Digest, sha3::{Sha3, Sha3Mode}};
 use openssl::{
     hash::MessageDigest,
     pkey::{
@@ -44,7 +41,7 @@ impl BlockHash {
         previous_hash: Option<BlockHash>,
         key: Key,
     ) -> Self {
-        let mut hasher = Sha1::new();
+        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
         hasher.input_str(&HASH_VERSION.to_string());
         hasher.input_str(&payload);
@@ -129,6 +126,12 @@ impl BlockBuilder {
             &self.key.as_ref().unwrap(),
             &self.signature.as_ref().unwrap(),
         )
+    }
+}
+
+impl Default for BlockBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -304,7 +307,7 @@ pub struct Key(pub Vec<u8>);
 impl Key {
     pub fn hash_it(&self) -> String {
         let str_key = self.to_string();
-        let mut hasher = Sha1::new();
+        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
         hasher.input_str(&str_key);
         hasher.result_str()
     }
@@ -338,7 +341,7 @@ impl SignVerifier for Wallet {
 
 impl Wallet {
     pub fn new() -> Self {
-        let keypair = Rsa::generate(515).unwrap();
+        let keypair = Rsa::generate(1024).unwrap();
         let keypair = PKey::from_rsa(keypair).unwrap();
 
         Self { keypair }
@@ -357,6 +360,12 @@ impl Wallet {
     pub fn get_public(&self) -> Key {
         let public_key = self.keypair.public_key_to_pem().unwrap();
         Key(public_key)
+    }
+}
+
+impl Default for Wallet {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -448,6 +457,12 @@ impl Configuration {
         } else {
             Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))
         }
+    }
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

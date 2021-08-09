@@ -1,12 +1,4 @@
-use chrono::prelude::*;
-use openssl::{
-    pkey::PKey,
-    rsa::Rsa,
-};
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use std::sync::{Arc, Mutex};
 
 use blockchain::{
     BlockBuilder,
@@ -15,14 +7,12 @@ use blockchain::{
     PublicAddress,
     Wallet,
 };
+use chrono::Utc;
+use openssl::{pkey::PKey, rsa::Rsa};
 
-use node::start_node;
-
-#[tokio::main]
-async fn main() {
+#[test]
+fn test() {
     let config = Arc::new(Mutex::new(Configuration::new()));
-
-    start_node(config.clone());
 
     let mut blockchain = Blockchain::new("mars", config);
 
@@ -65,18 +55,6 @@ async fn main() {
     assert!(block_3.verify_sign_with(&account_a));
     assert!(!block_3.verify_sign_with(&account_b));
 
-    for block in blockchain.iter() {
-        let hash = &block.hash.hash;
-        let timestamp = &block.timestamp;
-        let key = &block.key;
-        println!(
-            "[{hash}] - {timestamp} - made by {key}",
-            hash = hash,
-            timestamp = timestamp,
-            key = key.hash_it()
-        );
-    }
-
     assert!(blockchain.verify_integrity().is_ok());
 
     let public_account_a = PublicAddress {
@@ -88,8 +66,4 @@ async fn main() {
 
     assert!(block_3.verify_sign_with(&public_account_a));
 
-    println!(
-        "\nLast block hash is {:?}",
-        blockchain.peek().unwrap().hash.hash
-    );
 }

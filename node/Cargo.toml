@@ -11,6 +11,12 @@ serde = { version = "1.0.127", features = ["derive"] }
 jsonrpc-http-server = "18.0.0"
 futures = "0.3.16"
 tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}
+jsonrpc-derive = "18.0.0"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = "18.0.0"
+chrono = "0.4.19"
+openssl = "0.10.35"
+rust-crypto = "0.2.36"
 
 [dev-dependencies]
 actix-rt = "2.2.0"

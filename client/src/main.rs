@@ -1,25 +1,31 @@
-#[jsonrpc_client::api]
-trait Math {
-    async fn get_chain_length(&self) -> String;
+use std::future::Future;
+
+use jsonrpc_client_transports::{
+    transports::http,
+    RpcChannel,
+    RpcResult,
+    TypedClient,
+};
+#[derive(Clone)]
+struct RPCCLient(TypedClient);
+
+impl From<RpcChannel> for RPCCLient {
+    fn from(channel: RpcChannel) -> Self {
+        RPCCLient(channel.into())
+    }
 }
 
-#[jsonrpc_client::implement(Math)]
-struct Client {
-    inner: reqwest::Client,
-    base_url: reqwest::Url,
-}
-
-impl Client {
-    fn new(base_url: String) -> Result<Self, ()> {
-        Ok(Self {
-            inner: reqwest::Client::new(),
-            base_url: base_url.parse().unwrap(),
-        })
+impl RPCCLient {
+    fn get_chain_length(&self) -> impl Future<Output = RpcResult<usize>> {
+        self.0.call_method("get_chain_length", "Number", ())
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let client = Client::new("http://localhost:3030".to_owned()).unwrap();
-    println!("{}", client.get_chain_length().await.unwrap());
+    let client: RPCCLient = http::connect("http://localhost:3030").await.unwrap();
+
+    let n = client.get_chain_length().await.unwrap();
+
+    println!("{}", n);
 }
