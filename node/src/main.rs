@@ -8,7 +8,10 @@ use blockchain::{
     Configuration,
 };
 
-use jsonrpc_http_server::{*, jsonrpc_core::*};
+use jsonrpc_http_server::{
+    jsonrpc_core::*,
+    *,
+};
 
 use jsonrpc_derive::rpc;
 
@@ -72,15 +75,14 @@ pub async fn start_servers(state: Arc<Mutex<NodeState>>) {
             .cors(DomainsValidation::AllowOnly(vec![
                 AccessControlAllowOrigin::Null,
             ]))
-            .meta_extractor(|_req: &hyper::Request<hyper::Body>| {
-                ReqInfo(String::from("_"))
-            })
+            .meta_extractor(|_req: &hyper::Request<hyper::Body>| ReqInfo(String::from("_")))
             .start_http(&format!("{}:{}", HOSTNAME, RPC_PORT).parse().unwrap())
             .expect("Unable to start RPC server");
 
         server.wait();
-    }).await.unwrap();
-
+    })
+    .await
+    .unwrap();
 }
 
 pub struct PeerNode {
