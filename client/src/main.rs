@@ -19,6 +19,9 @@ impl RPCCLient {
     fn get_chain_length(&self) -> impl Future<Output = RpcResult<usize>> {
         self.0.call_method("get_chain_length", "Number", ())
     }
+    fn make_handshake(&self) -> impl Future<Output = RpcResult<()>> {
+        self.0.call_method("make_handshake", "()", ())
+    }
 }
 
 #[tokio::main]
@@ -28,4 +31,6 @@ async fn main() {
     let n = client.get_chain_length().await.unwrap();
 
     println!("{}", n);
+
+    client.make_handshake().await.unwrap();
 }

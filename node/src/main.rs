@@ -3,23 +3,15 @@ use std::sync::{
     Mutex,
 };
 
-use actix_web::{
-    App,
-    HttpServer,
-};
 use blockchain::{
     Blockchain,
     Configuration,
 };
 
-use jsonrpc_http_server::{
-    jsonrpc_core::*,
-    *,
-};
+use jsonrpc_http_server::{*, jsonrpc_core::*};
 
 use jsonrpc_derive::rpc;
 
-pub mod controllers;
 pub mod methods;
 
 use methods::{
@@ -33,7 +25,6 @@ use serde::{
 };
 
 static RPC_PORT: u16 = 3030;
-static HTTP_PORT: u16 = 8080;
 static HOSTNAME: &str = "127.0.0.1";
 
 #[rpc]
@@ -44,7 +35,7 @@ pub trait RpcMethods {
     fn get_chain_length(&self) -> Result<usize>;
 
     #[rpc(meta, name = "make_handshake")]
-    fn make_handshake(&self, req_info: Self::Metadata);
+    fn make_handshake(&self, req_info: Self::Metadata) -> Result<()>;
 }
 
 struct RpcManager {
@@ -58,8 +49,9 @@ impl RpcMethods for RpcManager {
         get_chain_length(&self.state)
     }
 
-    fn make_handshake(&self, req_info: Self::Metadata) {
-        make_handshake::<Self::Metadata>(req_info)
+    fn make_handshake(&self, req_info: Self::Metadata) -> Result<()> {
+        make_handshake::<Self::Metadata>(req_info);
+        Ok(())
     }
 }
 
@@ -68,7 +60,6 @@ pub struct ReqInfo(String);
 
 impl Metadata for ReqInfo {}
 
-#[actix_web::main]
 pub async fn start_servers(state: Arc<Mutex<NodeState>>) {
     let mut io = MetaIoHandler::default();
 
@@ -81,27 +72,15 @@ pub async fn start_servers(state: Arc<Mutex<NodeState>>) {
             .cors(DomainsValidation::AllowOnly(vec![
                 AccessControlAllowOrigin::Null,
             ]))
-            .meta_extractor(|req: &hyper::Request<hyper::Body>| {
-                let hostname = req
-                    .headers()
-                    .get(hyper::header::HOST)
-                    .map(|h| h.to_str().unwrap_or("").to_owned())
-                    .unwrap();
-
-                ReqInfo(hostname)
+            .meta_extractor(|_req: &hyper::Request<hyper::Body>| {
+                ReqInfo(String::from("_"))
             })
             .start_http(&format!("{}:{}", HOSTNAME, RPC_PORT).parse().unwrap())
             .expect("Unable to start RPC server");
 
         server.wait();
-    });
+    }).await.unwrap();
 
-    HttpServer::new(App::new)
-        .bind((HOSTNAME, HTTP_PORT))
-        .unwrap()
-        .run()
-        .await
-        .unwrap();
 }
 
 pub struct PeerNode {
@@ -122,5 +101,5 @@ async fn main() {
         peers: vec![],
     }));
 
-    start_servers(state);
+    start_servers(state).await;
 }
