@@ -1,6 +1,13 @@
+use blockchain::Transaction;
+use jsonrpc_client_transports::{
+    transports::http,
+    RpcChannel,
+    RpcError,
+    RpcResult,
+    TypedClient,
+};
 use std::future::Future;
 
-use jsonrpc_client_transports::{RpcChannel, RpcError, RpcResult, TypedClient, transports::http};
 #[derive(Clone)]
 pub struct RPCClient(TypedClient);
 
@@ -22,5 +29,12 @@ impl RPCClient {
     }
     pub fn make_handshake(&self) -> impl Future<Output = RpcResult<()>> {
         self.0.call_method("make_handshake", "()", ())
+    }
+    pub fn add_transaction(
+        &self,
+        transaction: Transaction,
+    ) -> impl Future<Output = RpcResult<String>> {
+        self.0
+            .call_method("add_transaction", "String", (transaction,))
     }
 }

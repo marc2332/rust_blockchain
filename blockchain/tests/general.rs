@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    Mutex,
+};
 
 use blockchain::{
     BlockBuilder,
@@ -8,7 +11,10 @@ use blockchain::{
     Wallet,
 };
 use chrono::Utc;
-use openssl::{pkey::PKey, rsa::Rsa};
+use openssl::{
+    pkey::PKey,
+    rsa::Rsa,
+};
 
 #[test]
 fn test() {
@@ -65,5 +71,4 @@ fn test() {
     };
 
     assert!(block_3.verify_sign_with(&public_account_a));
-
 }

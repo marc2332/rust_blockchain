@@ -1,10 +1,17 @@
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime,
+    Utc,
+};
 use serde::{
     Deserialize,
     Serialize,
 };
 
-use crate::{BlockHash, Key, SignVerifier};
+use crate::{
+    BlockHash,
+    Key,
+    SignVerifier,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
@@ -42,6 +49,21 @@ impl Block {
             key: key.clone(),
             signature,
             index: None,
+        }
+    }
+
+    pub fn verify_integrity(&self) -> Result<(), ()> {
+        let must_hash = BlockHash::new(
+            self.payload.clone(),
+            self.timestamp.clone(),
+            self.previous_hash.clone(),
+            self.key.clone(),
+        );
+
+        if must_hash == self.hash {
+            Ok(())
+        } else {
+            Err(())
         }
     }
 

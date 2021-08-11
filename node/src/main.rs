@@ -15,12 +15,17 @@ use jsonrpc_http_server::{
 
 use jsonrpc_derive::rpc;
 
+pub mod mempool;
 pub mod methods;
 
 use methods::{
+    add_transaction,
     get_chain_length,
     make_handshake,
 };
+
+use blockchain::Transaction;
+use mempool::Mempool;
 
 use serde::{
     Deserialize,
@@ -39,6 +44,9 @@ pub trait RpcMethods {
 
     #[rpc(meta, name = "make_handshake")]
     fn make_handshake(&self, req_info: Self::Metadata) -> Result<()>;
+
+    #[rpc(name = "add_transaction")]
+    fn add_transaction(&self, transaction: Transaction) -> Result<String>;
 }
 
 struct RpcManager {
@@ -55,6 +63,10 @@ impl RpcMethods for RpcManager {
     fn make_handshake(&self, req_info: Self::Metadata) -> Result<()> {
         make_handshake::<Self::Metadata>(req_info);
         Ok(())
+    }
+
+    fn add_transaction(&self, transaction: Transaction) -> Result<String> {
+        add_transaction(&self.state, transaction)
     }
 }
 
@@ -92,6 +104,7 @@ pub struct PeerNode {
 pub struct NodeState {
     pub blockchain: Blockchain,
     pub peers: Vec<PeerNode>,
+    pub mempool: Mempool,
 }
 
 #[tokio::main]
@@ -100,6 +113,7 @@ async fn main() {
 
     let state = Arc::new(Mutex::new(NodeState {
         blockchain: Blockchain::new("mars", config),
+        mempool: Mempool::default(),
         peers: vec![],
     }));
 

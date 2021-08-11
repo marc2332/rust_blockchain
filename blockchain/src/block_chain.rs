@@ -1,8 +1,19 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    Mutex,
+};
 
-use openssl::{pkey::PKey, rsa::Rsa};
+use openssl::{
+    pkey::PKey,
+    rsa::Rsa,
+};
 
-use crate::{Block, BlockHash, Configuration, PublicAddress};
+use crate::{
+    Block,
+    BlockHash,
+    Configuration,
+    PublicAddress,
+};
 
 pub struct Blockchain {
     pub name: String,
@@ -16,6 +27,7 @@ pub struct Blockchain {
 pub enum BlockchainErrors {
     InvalidPrevioushHash(String, String),
     InvalidSignature,
+    InvalidHash,
     CouldntLoadBlock(String),
     CouldntAddBlock(String),
 }

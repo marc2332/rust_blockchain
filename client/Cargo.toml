@@ -10,6 +10,8 @@ jsonrpc-derive = "18.0.0"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = "18.0.0"
 jsonrpc-client-transports = "18.0.0"
+blockchain = { path = "../blockchain"}
+rust-crypto = "0.2.36"
 
 [dev-dependencies]
 tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}

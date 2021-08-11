@@ -1,7 +1,20 @@
-use openssl::{hash::MessageDigest, pkey::{PKey, Private}, rsa::Rsa, sign::{Signer, Verifier}};
+use openssl::{
+    hash::MessageDigest,
+    pkey::{
+        PKey,
+        Private,
+    },
+    rsa::Rsa,
+    sign::{
+        Signer,
+        Verifier,
+    },
+};
 
-use crate::{Key, SignVerifier};
-
+use crate::{
+    Key,
+    SignVerifier,
+};
 
 pub struct Wallet {
     pub keypair: PKey<Private>,

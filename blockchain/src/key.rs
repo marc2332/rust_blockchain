@@ -1,6 +1,12 @@
 use std::fmt;
 
-use crypto::{digest::Digest, sha3::{Sha3, Sha3Mode}};
+use crypto::{
+    digest::Digest,
+    sha3::{
+        Sha3,
+        Sha3Mode,
+    },
+};
 use serde::{
     Deserialize,
     Serialize,

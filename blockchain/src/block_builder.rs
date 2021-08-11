@@ -1,6 +1,14 @@
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime,
+    Utc,
+};
 
-use crate::{Block, BlockHash, Key, Wallet};
+use crate::{
+    Block,
+    BlockHash,
+    Key,
+    Wallet,
+};
 
 pub struct BlockBuilder {
     pub hash: Option<BlockHash>,

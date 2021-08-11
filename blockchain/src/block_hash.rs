@@ -1,8 +1,14 @@
+use crypto::{
+    digest::Digest,
+    sha3::{
+        Sha3,
+        Sha3Mode,
+    },
+};
 use serde::{
     Deserialize,
     Serialize,
 };
-use crypto::{digest::Digest, sha3::{Sha3, Sha3Mode}};
 
 use crate::Key;
 

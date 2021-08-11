@@ -1,4 +1,7 @@
-use crate::{Block, BlockchainErrors};
+use crate::{
+    Block,
+    BlockchainErrors,
+};
 
 #[derive(Clone)]
 pub struct Configuration {
@@ -37,8 +40,13 @@ impl Configuration {
                 // Block serialized
                 if let Ok(block) = serde_json::from_str(&block_info) {
                     let block: Block = block;
-                    println!("Loaded block {}", &block.hash.unite());
-                    chain.push(block)
+
+                    if block.verify_integrity().is_ok() {
+                        println!("Loaded block {}", &block.hash.unite());
+                        chain.push(block)
+                    } else {
+                        return Err(BlockchainErrors::InvalidHash);
+                    }
                 } else {
                     return Err(BlockchainErrors::CouldntLoadBlock(
                         String::from_utf8(block_hash.to_vec()).unwrap(),
