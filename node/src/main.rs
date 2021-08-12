@@ -4,10 +4,14 @@ use std::sync::{
 };
 
 use blockchain::{
+    BlockBuilder,
     Blockchain,
     Configuration,
+    Wallet,
 };
 
+use chrono::Utc;
+use futures::executor::block_on;
 use jsonrpc_http_server::{
     jsonrpc_core::*,
     *,
@@ -66,7 +70,7 @@ impl RpcMethods for RpcManager {
     }
 
     fn add_transaction(&self, transaction: Transaction) -> Result<String> {
-        add_transaction(&self.state, transaction)
+        block_on(add_transaction(&self.state, transaction))
     }
 }
 
@@ -105,17 +109,36 @@ pub struct NodeState {
     pub blockchain: Blockchain,
     pub peers: Vec<PeerNode>,
     pub mempool: Mempool,
+    pub wallet: Wallet,
 }
 
 #[tokio::main]
 async fn main() {
     let config = Arc::new(Mutex::new(Configuration::new()));
 
+    let mut blockchain = Blockchain::new("mars", config);
+
+    if blockchain.last_block_hash.is_none() {
+        let genesis_wallet = Wallet::new();
+
+        let genesis_block = BlockBuilder::new()
+            .payload("Genesis Block")
+            .timestamp(Utc::now())
+            .key(&genesis_wallet.get_public())
+            .sign_with(&genesis_wallet)
+            .build();
+
+        blockchain.add_block(&genesis_block);
+    }
+
     let state = Arc::new(Mutex::new(NodeState {
-        blockchain: Blockchain::new("mars", config),
+        blockchain,
         mempool: Mempool::default(),
         peers: vec![],
+        wallet: Wallet::default(),
     }));
+
+    assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
 
     start_servers(state).await;
 }

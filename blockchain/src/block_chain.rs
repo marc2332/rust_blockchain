@@ -3,17 +3,7 @@ use std::sync::{
     Mutex,
 };
 
-use openssl::{
-    pkey::PKey,
-    rsa::Rsa,
-};
-
-use crate::{
-    Block,
-    BlockHash,
-    Configuration,
-    PublicAddress,
-};
+use crate::{Block, BlockHash, Configuration, PublicAddress};
 
 pub struct Blockchain {
     pub name: String,
@@ -67,13 +57,15 @@ impl Blockchain {
         if db_result.is_ok() {
             self.chain.push(block.clone());
 
-            self.last_block_hash = Some(block.hash);
+            self.last_block_hash = Some(block.hash.clone());
         } else {
             // WIP
             println!("error");
         }
 
         assert!(self.verify_integrity().is_ok());
+
+        println!("Added block {}", &block.hash.unite());
     }
 
     /*
@@ -111,10 +103,7 @@ impl Blockchain {
                 }
             }
 
-            let block_signer = PublicAddress {
-                keypair: PKey::from_rsa(Rsa::public_key_from_pem(block.key.0.as_slice()).unwrap())
-                    .unwrap(),
-            };
+            let block_signer = PublicAddress::from(&block.key);
 
             /*
              * The signature must be correct according the public key and the block data

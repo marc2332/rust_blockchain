@@ -15,12 +15,15 @@ use openssl::{
     pkey::PKey,
     rsa::Rsa,
 };
+use rand_core::block;
 
 #[test]
 fn test() {
     let config = Arc::new(Mutex::new(Configuration::new()));
 
     let mut blockchain = Blockchain::new("mars", config);
+
+    assert!(blockchain.verify_integrity().is_ok());
 
     let account_a = Wallet::new();
     let public_key = account_a.get_public();
@@ -65,7 +68,7 @@ fn test() {
 
     let public_account_a = PublicAddress {
         keypair: PKey::from_rsa(
-            Rsa::public_key_from_pem(account_a.get_public().0.as_slice()).unwrap(),
+            Rsa::public_key_from_pem(public_key.0.as_slice()).unwrap(),
         )
         .unwrap(),
     };

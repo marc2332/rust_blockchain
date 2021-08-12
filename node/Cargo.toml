@@ -16,6 +16,7 @@ jsonrpc-core-client = "18.0.0"
 chrono = "0.4.19"
 openssl = "0.10.35"
 rust-crypto = "0.2.36"
+consensus = { path = "../consensus"}
 
 [dev-dependencies]
 actix-rt = "2.2.0"

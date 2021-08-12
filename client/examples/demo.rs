@@ -18,11 +18,11 @@ async fn main() {
     let client = RPCClient::new("http://localhost:3030").await.unwrap();
 
     // Easily call methods remotely
-    let chain_length = client.get_chain_length().await.unwrap();
+    let _chain_length = client.get_chain_length().await.unwrap();
 
-    println!("{}", chain_length);
+    //println!("{}", chain_length);
 
-    client.make_handshake().await.unwrap();
+    //client.make_handshake().await.unwrap();
 
     let wallet_a = Wallet::new();
     let wallet_b = Wallet::new();

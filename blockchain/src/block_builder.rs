@@ -66,11 +66,11 @@ impl BlockBuilder {
 
     pub fn build(&self) -> Block {
         Block::new(
-            &self.payload.as_ref().unwrap(),
+            self.payload.as_ref().unwrap(),
             self.timestamp.unwrap(),
             &self.previous_hash,
-            &self.key.as_ref().unwrap(),
-            &self.signature.as_ref().unwrap(),
+            self.key.as_ref().unwrap(),
+            self.signature.as_ref().unwrap(),
         )
     }
 }

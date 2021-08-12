@@ -47,7 +47,7 @@ impl Transaction {
         }
 
         // Make sure the hash is not altered
-        if &self.hash_it() != &self.hash {
+        if self.hash_it() != self.hash {
             return false;
         }
 
