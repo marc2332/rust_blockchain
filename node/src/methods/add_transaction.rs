@@ -53,12 +53,7 @@ pub async fn add_transaction(
 
             let _result = goal.start().await;
 
-            let block_data = state
-                .mempool
-                .pending_transactions
-                .iter()
-                .map(|tx| serde_json::to_string(tx).unwrap())
-                .collect::<String>();
+            let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 
             let new_block = BlockBuilder::new()
                 .payload(&block_data)

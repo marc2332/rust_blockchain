@@ -2,7 +2,13 @@ use blockchain::{
     Transaction,
     Wallet,
 };
+
 use client::RPCClient;
+use criterion::{
+    criterion_group,
+    criterion_main,
+    Criterion,
+};
 use crypto::{
     digest::Digest,
     sha3::{
@@ -12,16 +18,8 @@ use crypto::{
 };
 
 #[tokio::main]
-async fn main() {
-    // Connect to the node's RPC server
+async fn execute_100_transactions() {
     let client = RPCClient::new("http://localhost:3030").await.unwrap();
-
-    // Easily call methods remotely
-    let _chain_length = client.get_chain_length().await.unwrap();
-
-    //println!("{}", chain_length);
-
-    //client.make_handshake().await.unwrap();
 
     let wallet_a = Wallet::new();
     let wallet_b = Wallet::new();
@@ -58,7 +56,14 @@ async fn main() {
         hash,
     };
 
-    let res = client.add_transaction(sample_tx).await;
-
-    println!("{:?}", res.unwrap());
+    client.add_transaction(sample_tx.clone()).await.unwrap();
 }
+
+fn benchs(c: &mut Criterion) {
+    c.bench_function("execute_100_transactions", |b| {
+        b.iter(|| execute_100_transactions());
+    });
+}
+
+criterion_group!(benches, benchs);
+criterion_main!(benches);

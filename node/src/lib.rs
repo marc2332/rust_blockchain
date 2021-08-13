@@ -113,11 +113,12 @@ pub struct NodeState {
 }
 
 #[tokio::main]
-async fn main() {
+pub async fn main() {
     let config = Arc::new(Mutex::new(Configuration::new()));
 
     let mut blockchain = Blockchain::new("mars", config);
 
+    // Create a genesis block if there isn't
     if blockchain.last_block_hash.is_none() {
         let genesis_wallet = Wallet::new();
 

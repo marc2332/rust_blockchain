@@ -11,11 +11,6 @@ use blockchain::{
     Wallet,
 };
 use chrono::Utc;
-use openssl::{
-    pkey::PKey,
-    rsa::Rsa,
-};
-use rand_core::block;
 
 #[test]
 fn test() {
@@ -66,12 +61,7 @@ fn test() {
 
     assert!(blockchain.verify_integrity().is_ok());
 
-    let public_account_a = PublicAddress {
-        keypair: PKey::from_rsa(
-            Rsa::public_key_from_pem(public_key.0.as_slice()).unwrap(),
-        )
-        .unwrap(),
-    };
+    let public_account_a = PublicAddress::from(&public_key);
 
     assert!(block_3.verify_sign_with(&public_account_a));
 }
