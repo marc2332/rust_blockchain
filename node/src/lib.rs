@@ -7,6 +7,7 @@ use blockchain::{
     BlockBuilder,
     Blockchain,
     Configuration,
+    TransactionBuilder,
     Wallet,
 };
 
@@ -122,10 +123,22 @@ pub async fn main() {
     if blockchain.last_block_hash.is_none() {
         let genesis_wallet = Wallet::new();
 
+        let genesis_transaction = TransactionBuilder::new()
+            .key(&genesis_wallet.get_public())
+            .from_address(&genesis_wallet.get_public().hash_it())
+            .to_address(&genesis_wallet.get_public().hash_it())
+            .ammount(100)
+            .hash_it()
+            .sign_with(&genesis_wallet)
+            .build();
+
+        let block_data = serde_json::to_string(&vec![genesis_transaction]).unwrap();
+
         let genesis_block = BlockBuilder::new()
-            .payload("Genesis Block")
+            .payload(&block_data)
             .timestamp(Utc::now())
             .key(&genesis_wallet.get_public())
+            .hash_it()
             .sign_with(&genesis_wallet)
             .build();
 

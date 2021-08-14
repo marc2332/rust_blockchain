@@ -31,7 +31,6 @@ impl Transaction {
     pub fn hash_it(&self) -> String {
         let mut hasher = Sha3::new(Sha3Mode::Keccak256);
         hasher.input_str(&self.author_public_key.to_string());
-        hasher.input_str(&self.signature.hash_it());
         hasher.input_str(&self.from_address);
         hasher.input_str(&self.to_address);
         hasher.input_str(&self.ammount.to_string());
@@ -54,11 +53,6 @@ impl Transaction {
         // Verify the signature
         let public_address = PublicAddress::from(&self.author_public_key);
 
-        let data = format!(
-            "{}{}{}{}",
-            self.author_public_key, self.from_address, self.to_address, self.ammount
-        );
-
-        public_address.verify_signature(&self.signature, data)
+        public_address.verify_signature(&self.signature, self.hash.to_string())
     }
 }

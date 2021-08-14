@@ -52,15 +52,17 @@ impl BlockBuilder {
     }
 
     pub fn sign_with(&mut self, acc: &Wallet) -> &mut Self {
-        // Terribly ugly, I know
-        let data = format!(
-            "{}{}{}{:?}",
-            self.key.as_ref().unwrap(),
-            self.timestamp.as_ref().unwrap(),
-            self.payload.as_ref().unwrap(),
-            self.previous_hash
-        );
-        self.signature = Some(acc.sign_data(data));
+        self.signature = Some(acc.sign_data(self.hash.as_ref().unwrap().unite()));
+        self
+    }
+
+    pub fn hash_it(&mut self) -> &mut Self {
+        self.hash = Some(BlockHash::new(
+            self.payload.as_ref().unwrap().to_string(),
+            self.timestamp.unwrap().to_string(),
+            self.previous_hash.clone(),
+            self.key.as_ref().unwrap().clone(),
+        ));
         self
     }
 
@@ -68,6 +70,7 @@ impl BlockBuilder {
         Block::new(
             self.payload.as_ref().unwrap(),
             self.timestamp.unwrap(),
+            &self.hash.as_ref().unwrap(),
             &self.previous_hash,
             self.key.as_ref().unwrap(),
             self.signature.as_ref().unwrap(),

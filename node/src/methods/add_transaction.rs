@@ -40,7 +40,7 @@ pub async fn add_transaction(
         state.mempool.add_transaction(transaction);
 
         // Minimum transactions are harcoded for now
-        if state.mempool.pending_transactions.len() > 0 {
+        if state.mempool.pending_transactions.len() > 2 {
             let minner = Player::new(0);
 
             let last_hash = state.blockchain.peek().unwrap().hash.unite();
@@ -60,6 +60,7 @@ pub async fn add_transaction(
                 .timestamp(Utc::now())
                 .key(&state.wallet.get_public())
                 .previous_hash(&state.blockchain.last_block_hash.clone().unwrap())
+                .hash_it()
                 .sign_with(&state.wallet)
                 .build();
 

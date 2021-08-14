@@ -6,6 +6,7 @@ mod configuration;
 mod key;
 mod public_address;
 mod transaction;
+mod transaction_builder;
 mod wallet;
 
 pub use block::Block;
@@ -19,6 +20,7 @@ pub use configuration::Configuration;
 pub use key::Key;
 pub use public_address::PublicAddress;
 pub use transaction::Transaction;
+pub use transaction_builder::TransactionBuilder;
 pub use wallet::Wallet;
 
 pub trait SignVerifier {

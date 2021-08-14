@@ -28,6 +28,7 @@ impl Block {
     pub fn new(
         payload: &str,
         timestamp: DateTime<Utc>,
+        hash: &BlockHash,
         previous_hash: &Option<BlockHash>,
         key: &Key,
         signature: &Key,
@@ -35,14 +36,10 @@ impl Block {
         let timestamp = timestamp.to_string();
         let payload = payload.to_string();
         let signature = signature.clone();
+        let hash = hash.clone();
         let previous_hash = previous_hash.clone();
         Self {
-            hash: BlockHash::new(
-                payload.clone(),
-                timestamp.clone(),
-                previous_hash.clone(),
-                key.clone(),
-            ),
+            hash,
             timestamp,
             payload,
             previous_hash,
@@ -68,12 +65,6 @@ impl Block {
     }
 
     pub fn verify_sign_with(&self, acc: &impl SignVerifier) -> bool {
-        // Terribly ugly, I know
-        let data = format!(
-            "{}{}{}{:?}",
-            self.key, self.timestamp, self.payload, self.previous_hash
-        );
-
-        acc.verify_signature(&self.signature, data)
+        acc.verify_signature(&self.signature, self.hash.unite())
     }
 }

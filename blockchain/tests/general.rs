@@ -29,6 +29,7 @@ fn test() {
                 .payload("block 1")
                 .timestamp(Utc::now())
                 .key(&public_key)
+                .hash_it()
                 .sign_with(&account_a)
                 .build(),
         );
@@ -41,6 +42,7 @@ fn test() {
                 .timestamp(Utc::now())
                 .previous_hash(&blockchain.last_block_hash.clone().unwrap())
                 .key(&public_key)
+                .hash_it()
                 .sign_with(&account_a)
                 .build(),
         );
@@ -50,6 +52,7 @@ fn test() {
         .payload("Block 1")
         .timestamp(Utc::now())
         .key(&public_key)
+        .hash_it()
         .sign_with(&account_a)
         .build();
 

@@ -3,7 +3,12 @@ use std::sync::{
     Mutex,
 };
 
-use crate::{Block, BlockHash, Configuration, PublicAddress};
+use crate::{
+    Block,
+    BlockHash,
+    Configuration,
+    PublicAddress,
+};
 
 pub struct Blockchain {
     pub name: String,
