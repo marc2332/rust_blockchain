@@ -123,9 +123,11 @@ pub async fn main() {
     if blockchain.last_block_hash.is_none() {
         let genesis_wallet = Wallet::new();
 
+        println!("{:?}", genesis_wallet.get_private().0);
+
         let genesis_transaction = TransactionBuilder::new()
             .key(&genesis_wallet.get_public())
-            .from_address(&genesis_wallet.get_public().hash_it())
+            .from_address("0x")
             .to_address(&genesis_wallet.get_public().hash_it())
             .ammount(100)
             .hash_it()

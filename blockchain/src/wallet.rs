@@ -50,6 +50,17 @@ impl Wallet {
         let public_key = self.keypair.public_key_to_pem().unwrap();
         Key(public_key)
     }
+
+    pub fn get_private(&self) -> Key {
+        let public_key = self.keypair.private_key_to_pem_pkcs8().unwrap();
+        Key(public_key)
+    }
+
+    pub fn from_private(private_key: &[u8]) -> Self {
+        let keypair = PKey::private_key_from_pem(private_key).unwrap();
+
+        Self { keypair }
+    }
 }
 
 impl Default for Wallet {

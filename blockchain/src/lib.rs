@@ -8,6 +8,7 @@ mod public_address;
 mod transaction;
 mod transaction_builder;
 mod wallet;
+mod chainstate;
 
 pub use block::Block;
 pub use block_builder::BlockBuilder;
@@ -22,6 +23,7 @@ pub use public_address::PublicAddress;
 pub use transaction::Transaction;
 pub use transaction_builder::TransactionBuilder;
 pub use wallet::Wallet;
+pub use chainstate::Chainstate;
 
 pub trait SignVerifier {
     fn verify_signature(&self, signature: &Key, data: String) -> bool;

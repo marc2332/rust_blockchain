@@ -1,14 +1,9 @@
-use std::sync::{
+use std::{sync::{
     Arc,
     Mutex,
-};
+}};
 
-use crate::{
-    Block,
-    BlockHash,
-    Configuration,
-    PublicAddress,
-};
+use crate::{Block, BlockHash, Chainstate, Configuration, PublicAddress, Transaction};
 
 pub struct Blockchain {
     pub name: String,
@@ -16,6 +11,7 @@ pub struct Blockchain {
     pub index: usize,
     pub last_block_hash: Option<BlockHash>,
     pub config: Arc<Mutex<Configuration>>,
+    pub state: Chainstate
 }
 
 #[derive(Debug)]
@@ -39,12 +35,17 @@ impl Blockchain {
             None
         };
 
+        let mut state = Chainstate::new(config.clone());
+
+        state.load_from_chain(name);
+
         Self {
             name: name.to_string(),
             chain,
             index,
             last_block_hash,
             config,
+            state
         }
     }
 
@@ -57,6 +58,14 @@ impl Blockchain {
         let mut block = block.clone();
         block.index = Some(self.index);
 
+        let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+
+        // Update chainstate with the new transactions
+        for tx in transactions.iter() {
+            self.state.effect_transaction(tx);
+        }
+
+        // Add the block to the database
         let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
 
         if db_result.is_ok() {
