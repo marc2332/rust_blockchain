@@ -1,17 +1,15 @@
-use consensus::{GoalBuilder, Player};
+use consensus::{GoalBuilder};
 
 #[tokio::main]
 async fn main(){
-    let player_a = Player::new(0);
 
     let mut goal = GoalBuilder::new()
-        .zeros(5)
-        .player(player_a)
+        .zeros(0)
         .data("_".to_string())
         .build();
 
     let result = goal.start().await;
 
-    println!("winner is {:?}", result);
+    println!("nonce is {:?}", result);
 
 }

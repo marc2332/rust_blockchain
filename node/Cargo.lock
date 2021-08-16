@@ -1731,6 +1731,7 @@ dependencies = [
  "jsonrpc-derive",
  "jsonrpc-http-server",
  "openssl",
+ "reqwest",
  "rust-crypto",
  "serde",
  "serde_derive",

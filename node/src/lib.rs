@@ -3,6 +3,8 @@ use std::sync::{
     Mutex,
 };
 
+use std::collections::HashMap;
+
 use blockchain::{
     BlockBuilder,
     Blockchain,
@@ -36,9 +38,6 @@ use serde::{
     Deserialize,
     Serialize,
 };
-
-static RPC_PORT: u16 = 3030;
-static HOSTNAME: &str = "127.0.0.1";
 
 #[rpc]
 pub trait RpcMethods {
@@ -80,81 +79,107 @@ pub struct ReqInfo(String);
 
 impl Metadata for ReqInfo {}
 
-pub async fn start_servers(state: Arc<Mutex<NodeState>>) {
-    let mut io = MetaIoHandler::default();
-
-    let manager = RpcManager { state };
-
-    io.extend_with(manager.to_delegate());
-
-    tokio::spawn(async move {
-        let server = ServerBuilder::new(io)
-            .cors(DomainsValidation::AllowOnly(vec![
-                AccessControlAllowOrigin::Null,
-            ]))
-            .meta_extractor(|_req: &hyper::Request<hyper::Body>| ReqInfo(String::from("_")))
-            .start_http(&format!("{}:{}", HOSTNAME, RPC_PORT).parse().unwrap())
-            .expect("Unable to start RPC server");
-
-        server.wait();
-    })
-    .await
-    .unwrap();
-}
-
-pub struct PeerNode {
-    pub hostname: String,
-}
-
 pub struct NodeState {
     pub blockchain: Blockchain,
-    pub peers: Vec<PeerNode>,
+    pub peers: HashMap<String, String>,
     pub mempool: Mempool,
     pub wallet: Wallet,
 }
 
-#[tokio::main]
-pub async fn main() {
-    let config = Arc::new(Mutex::new(Configuration::new()));
+pub struct Node {}
 
-    let mut blockchain = Blockchain::new("mars", config);
-
-    // Create a genesis block if there isn't
-    if blockchain.last_block_hash.is_none() {
-        let genesis_wallet = Wallet::new();
-
-        println!("{:?}", genesis_wallet.get_private().0);
-
-        let genesis_transaction = TransactionBuilder::new()
-            .key(&genesis_wallet.get_public())
-            .from_address("0x")
-            .to_address(&genesis_wallet.get_public().hash_it())
-            .ammount(100)
-            .hash_it()
-            .sign_with(&genesis_wallet)
-            .build();
-
-        let block_data = serde_json::to_string(&vec![genesis_transaction]).unwrap();
-
-        let genesis_block = BlockBuilder::new()
-            .payload(&block_data)
-            .timestamp(Utc::now())
-            .key(&genesis_wallet.get_public())
-            .hash_it()
-            .sign_with(&genesis_wallet)
-            .build();
-
-        blockchain.add_block(&genesis_block);
+impl Node {
+    pub fn new() -> Self {
+        Self {}
     }
 
-    let state = Arc::new(Mutex::new(NodeState {
-        blockchain,
-        mempool: Mempool::default(),
-        peers: vec![],
-        wallet: Wallet::default(),
-    }));
+    #[tokio::main]
+    pub async fn run(&mut self, config: Arc<Mutex<Configuration>>) {
+        let mut blockchain = Blockchain::new("mars", config.clone());
 
-    assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
+        let wallet = Wallet::default();
 
-    start_servers(state).await;
+        // Create a genesis block if there isn't
+        if blockchain.last_block_hash.is_none() {
+            println!("{:?}", wallet.get_private().0);
+
+            let genesis_transaction = TransactionBuilder::new()
+                .key(&wallet.get_public())
+                .from_address("0x")
+                .to_address(&wallet.get_public().hash_it())
+                .ammount(100)
+                .hash_it()
+                .sign_with(&wallet)
+                .build();
+
+            let block_data = serde_json::to_string(&vec![genesis_transaction]).unwrap();
+
+            let genesis_block = BlockBuilder::new()
+                .payload(&block_data)
+                .timestamp(Utc::now())
+                .key(&wallet.get_public())
+                .hash_it()
+                .sign_with(&wallet)
+                .build();
+
+            blockchain.add_block(&genesis_block);
+        }
+
+        /*
+        println!("Finding peers...");
+
+        let sign = wallet.sign_data(wallet.get_public().hash_it());
+
+        let obj = serde_json::json!({
+            "address": wallet.get_public().hash_it(),
+            "key": wallet.get_public(),
+            "sign": sign,
+        });
+
+        let client = reqwest::Client::new();
+
+        let peers = client.post("http://localhost:33140/signal")
+            .json(&obj)
+            .send()
+            .await.unwrap()
+            .json::<HashMap<String, String>>()
+            .await.unwrap();
+            */
+
+        let state = Arc::new(Mutex::new(NodeState {
+            blockchain,
+            mempool: Mempool::default(),
+            peers: HashMap::new(),
+            wallet,
+        }));
+
+        assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
+
+        let mut io = MetaIoHandler::default();
+
+        let manager = RpcManager { state };
+
+        io.extend_with(manager.to_delegate());
+
+        let config = config.lock().unwrap();
+
+        let hostname = config.hostname.clone();
+        let rpc_port = config.rpc_port.clone();
+
+        drop(config);
+
+        tokio::spawn(async move {
+            let server = ServerBuilder::new(io)
+                .cors(DomainsValidation::AllowOnly(vec![
+                    AccessControlAllowOrigin::Null,
+                ]))
+                .meta_extractor(|_req: &hyper::Request<hyper::Body>| ReqInfo(String::from("_")))
+                .start_http(&format!("{}:{}", hostname, rpc_port).parse().unwrap())
+                .expect("Unable to start RPC server");
+
+            server.wait();
+        })
+        .await
+        .unwrap();
+    }
 }

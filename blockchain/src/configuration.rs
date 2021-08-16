@@ -6,12 +6,18 @@ use crate::{
 #[derive(Clone)]
 pub struct Configuration {
     db: sled::Db,
+    pub rpc_port: u16,
+    pub hostname: String,
 }
 
 impl Configuration {
     pub fn new() -> Self {
         let db = sled::open("db").unwrap();
-        Self { db }
+        Self {
+            db,
+            rpc_port: 3030,
+            hostname: "0.0.0.0".to_string(),
+        }
     }
 
     /*

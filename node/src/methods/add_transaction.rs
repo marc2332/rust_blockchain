@@ -9,11 +9,6 @@ use serde::{
     Serialize,
 };
 
-use consensus::{
-    GoalBuilder,
-    Player,
-};
-
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
     Verified,
@@ -46,17 +41,18 @@ pub async fn add_transaction(
 
         // Minimum transactions per block are harcoded for now
         if state.mempool.pending_transactions.len() > 0 {
-            let minner = Player::new(0);
+            /*
+            // no
 
             let last_hash = state.blockchain.peek().unwrap().hash.unite();
 
             let mut goal = GoalBuilder::new()
                 .zeros(3)
                 .data(last_hash)
-                .player(minner)
                 .build();
 
             let _result = goal.start().await;
+            */
 
             let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 
