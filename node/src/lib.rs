@@ -125,7 +125,7 @@ impl Node {
             blockchain.add_block(&genesis_block);
         }
 
-        /*
+        
         println!("Finding peers...");
 
         let sign = wallet.sign_data(wallet.get_public().hash_it());
@@ -138,18 +138,24 @@ impl Node {
 
         let client = reqwest::Client::new();
 
-        let peers = client.post("http://localhost:33140/signal")
+        let peers = {
+            let res = client.post("http://localhost:33140/signal")
             .json(&obj)
             .send()
-            .await.unwrap()
-            .json::<HashMap<String, String>>()
-            .await.unwrap();
-            */
+            .await;
 
+            match res {
+                Ok(res) => {
+                    res.json::<HashMap<String, String>>().await.unwrap()
+                }
+                _ => HashMap::new()
+            }
+        };
+        
         let state = Arc::new(Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),
-            peers: HashMap::new(),
+            peers,
             wallet,
         }));
 
