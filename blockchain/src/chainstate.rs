@@ -1,26 +1,33 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        Mutex,
+    },
+};
 
-use crate::{Configuration, Transaction};
+use crate::{
+    Configuration,
+    Transaction,
+};
 
 pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
-    pub addresses: HashMap<String, u64>
+    pub addresses: HashMap<String, u64>,
 }
 
 impl Chainstate {
-
     pub fn new(config: Arc<Mutex<Configuration>>) -> Self {
         Self {
             config,
-            addresses: HashMap::new()
+            addresses: HashMap::new(),
         }
     }
 
     /*
      * Calculate the chainstate from the begining of the blockchain
      */
-    pub fn load_from_chain(&mut self, name:&str) {
-
+    pub fn load_from_chain(&mut self, name: &str) {
         let chain = self.config.lock().unwrap().get_blocks(name).unwrap();
 
         for block in chain.iter() {
@@ -29,9 +36,6 @@ impl Chainstate {
                 self.effect_transaction(tx);
             }
         }
-
-        
-
     }
 
     /*
@@ -60,26 +64,35 @@ impl Chainstate {
                     // Has enough ammount, OK
 
                     #[allow(mutable_borrow_reservation_conflict)]
-                    self.addresses.insert(tx.from_address.clone(), address_amm - tx.ammount);
+                    self.addresses
+                        .insert(tx.from_address.clone(), address_amm - tx.ammount);
 
                     if let Some(address_amm) = self.addresses.get(&tx.to_address.clone()) {
                         #[allow(mutable_borrow_reservation_conflict)]
-                        self.addresses.insert(tx.to_address.clone(), *address_amm + tx.ammount);
+                        self.addresses
+                            .insert(tx.to_address.clone(), *address_amm + tx.ammount);
                     } else {
-                        self.addresses.insert(tx.to_address.clone(),  tx.ammount);
+                        self.addresses.insert(tx.to_address.clone(), tx.ammount);
                     }
                 }
             }
+        } else if let Some(address_amm) = self.addresses.get(&tx.to_address.clone()) {
+            #[allow(mutable_borrow_reservation_conflict)]
+            self.addresses
+                .insert(tx.to_address.clone(), *address_amm + tx.ammount);
         } else {
-            if let Some(address_amm) = self.addresses.get(&tx.to_address.clone()) {
-                #[allow(mutable_borrow_reservation_conflict)]
-                self.addresses.insert(tx.to_address.clone(), *address_amm + tx.ammount);
-            } else {
-                self.addresses.insert(tx.to_address.clone(),  tx.ammount);
-            } 
+            self.addresses.insert(tx.to_address.clone(), tx.ammount);
         }
 
-        println!("\nFrom: {} has {}", tx.from_address, self.addresses.get(&tx.from_address.clone()).unwrap_or(&0));
-        println!("To: {} has {}", tx.to_address, self.addresses.get(&tx.to_address.clone()).unwrap());
+        println!(
+            "\nFrom: {} has {}",
+            tx.from_address,
+            self.addresses.get(&tx.from_address.clone()).unwrap_or(&0)
+        );
+        println!(
+            "To: {} has {}",
+            tx.to_address,
+            self.addresses.get(&tx.to_address.clone()).unwrap()
+        );
     }
 }

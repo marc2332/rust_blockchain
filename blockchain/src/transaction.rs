@@ -40,9 +40,11 @@ impl Transaction {
     pub fn verify(&self) -> bool {
         let public_key_hashed = self.author_public_key.hash_it();
 
-        // Ensure the hashed public key is the same as the from_address
-        if public_key_hashed != self.from_address {
-            return false;
+        if self.from_address != "0x" {
+            // Ensure the hashed public key is the same as the from_address
+            if public_key_hashed != self.from_address {
+                return false;
+            }
         }
 
         // Make sure the hash is not altered

@@ -21,6 +21,12 @@ pub struct TransactionBuilder {
     pub signature: Option<Key>,
 }
 
+impl Default for TransactionBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransactionBuilder {
     pub fn new() -> Self {
         Self {
@@ -56,8 +62,8 @@ impl TransactionBuilder {
     pub fn hash_it(&mut self) -> &mut Self {
         let mut hasher = Sha3::new(Sha3Mode::Keccak256);
         hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
-        hasher.input_str(&self.from_address.as_ref().unwrap());
-        hasher.input_str(&self.to_address.as_ref().unwrap());
+        hasher.input_str(self.from_address.as_ref().unwrap());
+        hasher.input_str(self.to_address.as_ref().unwrap());
         hasher.input_str(&self.ammount.unwrap().to_string());
         self.hash = Some(hasher.result_str());
         self
@@ -74,7 +80,7 @@ impl TransactionBuilder {
             signature: self.signature.as_ref().unwrap().clone(),
             from_address: self.from_address.as_ref().unwrap().clone(),
             to_address: self.to_address.as_ref().unwrap().clone(),
-            ammount: self.ammount.as_ref().unwrap().clone(),
+            ammount: *self.ammount.as_ref().unwrap(),
             hash: self.hash.as_ref().unwrap().clone(),
         }
     }

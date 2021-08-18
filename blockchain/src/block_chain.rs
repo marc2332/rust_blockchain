@@ -1,9 +1,16 @@
-use std::{sync::{
+use std::sync::{
     Arc,
     Mutex,
-}};
+};
 
-use crate::{Block, BlockHash, Chainstate, Configuration, PublicAddress, Transaction};
+use crate::{
+    Block,
+    BlockHash,
+    Chainstate,
+    Configuration,
+    PublicAddress,
+    Transaction,
+};
 
 pub struct Blockchain {
     pub name: String,
@@ -11,7 +18,7 @@ pub struct Blockchain {
     pub index: usize,
     pub last_block_hash: Option<BlockHash>,
     pub config: Arc<Mutex<Configuration>>,
-    pub state: Chainstate
+    pub state: Chainstate,
 }
 
 #[derive(Debug)]
@@ -45,7 +52,7 @@ impl Blockchain {
             index,
             last_block_hash,
             config,
-            state
+            state,
         }
     }
 

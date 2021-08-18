@@ -40,19 +40,32 @@ pub async fn add_transaction(
         state.mempool.add_transaction(transaction);
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 0 {
+        if !state.mempool.pending_transactions.is_empty() {
+
             /*
-            // no
+             * Algorithm to randomly take a block creator from people who have staked a small ammount on previous blocks
+             */
+            let _last_100_stakings = {
+                let mut stakers = Vec::<Transaction>::new();
+                for (i, block) in state.blockchain.iter().enumerate() {
+                    if i + 100 >= state.blockchain.chain.len() {
+                        let txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
-            let last_hash = state.blockchain.peek().unwrap().hash.unite();
+                        for transaction in txs {
+                            let tx_verification_is_ok = transaction.verify();
 
-            let mut goal = GoalBuilder::new()
-                .zeros(3)
-                .data(last_hash)
-                .build();
-
-            let _result = goal.start().await;
-            */
+                            if tx_verification_is_ok {
+                                if transaction.to_address == "stake" && stakers.len() < 100{
+                                    stakers.push(transaction);
+                                }
+                            } else {
+                                println!("Blockchain is broken.")
+                            }
+                        }
+                    }
+                }
+                stakers
+            };
 
             let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 

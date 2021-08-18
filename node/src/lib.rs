@@ -88,6 +88,12 @@ pub struct NodeState {
 
 pub struct Node {}
 
+impl Default for Node {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Node {
     pub fn new() -> Self {
         Self {}
@@ -112,7 +118,16 @@ impl Node {
                 .sign_with(&wallet)
                 .build();
 
-            let block_data = serde_json::to_string(&vec![genesis_transaction]).unwrap();
+            let staking_transaction = TransactionBuilder::new()
+                .key(&wallet.get_public())
+                .from_address(&wallet.get_public().hash_it())
+                .to_address("stake")
+                .ammount(5)
+                .hash_it()
+                .sign_with(&wallet)
+                .build();
+
+            let block_data = serde_json::to_string(&vec![genesis_transaction, staking_transaction]).unwrap();
 
             let genesis_block = BlockBuilder::new()
                 .payload(&block_data)
@@ -124,9 +139,6 @@ impl Node {
 
             blockchain.add_block(&genesis_block);
         }
-
-        
-        println!("Finding peers...");
 
         let sign = wallet.sign_data(wallet.get_public().hash_it());
 
@@ -170,7 +182,7 @@ impl Node {
         let config = config.lock().unwrap();
 
         let hostname = config.hostname.clone();
-        let rpc_port = config.rpc_port.clone();
+        let rpc_port = config.rpc_port;
 
         drop(config);
 
