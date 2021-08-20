@@ -41,31 +41,13 @@ pub async fn add_transaction(
 
         // Minimum transactions per block are harcoded for now
         if !state.mempool.pending_transactions.is_empty() {
-
             /*
-             * Algorithm to randomly take a block creator from people who have staked a small ammount on previous blocks
+             * The elected forget is the one who must forge the block
+             * This block will then by propagated to other nodes
+             * If another node tries to propagate a block with a wrong forger it should be punished and ignored
+             * WIP
              */
-            let _last_100_stakings = {
-                let mut stakers = Vec::<Transaction>::new();
-                for (i, block) in state.blockchain.iter().enumerate() {
-                    if i + 100 >= state.blockchain.chain.len() {
-                        let txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
-
-                        for transaction in txs {
-                            let tx_verification_is_ok = transaction.verify();
-
-                            if tx_verification_is_ok {
-                                if transaction.to_address == "stake" && stakers.len() < 100{
-                                    stakers.push(transaction);
-                                }
-                            } else {
-                                println!("Blockchain is broken.")
-                            }
-                        }
-                    }
-                }
-                stakers
-            };
+            let _elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
 
             let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 

@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "node",
+    "cli",
+    "consensus",
+    "client",
+    "discovery_server",
+    "blockchain"
+]

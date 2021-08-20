@@ -6,64 +6,38 @@ use crypto::{
     },
 };
 
-pub struct GoalBuilder {
-    zeros: Option<usize>,
-    data: Option<String>
+use blockchain::{
+    Blockchain,
+    Transaction,
+};
+
+#[derive(Debug)]
+pub enum ConsensusErrors {
+    TransactionBroken,
 }
 
-impl GoalBuilder {
-    pub fn new() -> Self {
-        Self {
-            zeros: None,
-            data: None
-        }
-    }
+/*
+ * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
+ */
+pub fn elect_forger(blockchain: &Blockchain) -> Result<Vec<Transaction>, ConsensusErrors> {
+    let mut stakers = Vec::<Transaction>::new();
+    for (i, block) in blockchain.iter().enumerate() {
+        if i + 100 >= blockchain.chain.len() {
+            let txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
-    pub fn zeros(&mut self, n: usize) -> &mut Self {
-        self.zeros = Some(n);
-        self
-    }
+            for transaction in txs {
+                let tx_verification_is_ok = transaction.verify();
 
-    pub fn data(&mut self, data: String) -> &mut Self {
-        self.data = Some(data);
-        self
-    }
-
-    pub fn build(&self) -> Goal {
-        Goal {
-            zeros: self.zeros.unwrap(),
-            data: self.data.as_ref().unwrap().clone()
-        }
-    }
-}
-
-pub struct Goal {
-    zeros: usize,
-    data: String
-}
-
-impl Goal {
-    
-    pub async fn start(&mut self) -> u64 {
-
-        let mut nonce = 0;
-
-        let goal = "0".repeat(self.zeros);
-            
-        loop {
-            let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-
-            hasher.input_str(&format!("{}{}",self.data,nonce));
-
-            let res = hasher.result_str();
-            
-            if res.starts_with(&goal) {
-                break;
-            } else {
-                nonce += 1;
+                if tx_verification_is_ok {
+                    if transaction.to_address == "stake" && stakers.len() < 100 {
+                        stakers.push(transaction);
+                    }
+                } else {
+                    println!("Blockchain is broken.");
+                    return Err(ConsensusErrors::TransactionBroken);
+                }
             }
         }
-
-        nonce
     }
+    Ok(stakers)
 }

@@ -127,7 +127,8 @@ impl Node {
                 .sign_with(&wallet)
                 .build();
 
-            let block_data = serde_json::to_string(&vec![genesis_transaction, staking_transaction]).unwrap();
+            let block_data =
+                serde_json::to_string(&vec![genesis_transaction, staking_transaction]).unwrap();
 
             let genesis_block = BlockBuilder::new()
                 .payload(&block_data)
@@ -151,19 +152,18 @@ impl Node {
         let client = reqwest::Client::new();
 
         let peers = {
-            let res = client.post("http://localhost:33140/signal")
-            .json(&obj)
-            .send()
-            .await;
+            let res = client
+                .post("http://localhost:33140/signal")
+                .json(&obj)
+                .send()
+                .await;
 
             match res {
-                Ok(res) => {
-                    res.json::<HashMap<String, String>>().await.unwrap()
-                }
-                _ => HashMap::new()
+                Ok(res) => res.json::<HashMap<String, String>>().await.unwrap(),
+                _ => HashMap::new(),
             }
         };
-        
+
         let state = Arc::new(Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),

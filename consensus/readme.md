@@ -1,1 +1,0 @@
-This contains a small and probably bad implemented of a hash calculator intended to be used for pow consensus algorithms.

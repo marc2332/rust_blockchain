@@ -1,21 +1,26 @@
 use actix_web::{
     web,
     App,
+    HttpRequest,
     HttpServer,
     Responder,
-    HttpRequest
 };
-use blockchain::{Key, PublicAddress, SignVerifier};
+use blockchain::{
+    Key,
+    PublicAddress,
+    SignVerifier,
+};
 use serde::{
     Deserialize,
     Serialize,
 };
-use std::sync::{
-    Arc,
-    Mutex,
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
-use std::collections::HashMap;
-
 
 #[derive(Serialize, Deserialize, Clone)]
 struct SignalRequest {
@@ -33,12 +38,15 @@ async fn signal(
     if public_address.verify_signature(&data.sign, data.address.clone()) {
         let req_info = req.connection_info();
         let ip = req_info.host();
-        state.lock().unwrap().signalers.insert(data.address.clone(), ip.to_string());
+        state
+            .lock()
+            .unwrap()
+            .signalers
+            .insert(data.address.clone(), ip.to_string());
         serde_json::to_string(&state.lock().unwrap().signalers).unwrap()
     } else {
         format!("failed")
     }
-    
 }
 
 #[derive(Default)]
@@ -54,7 +62,7 @@ async fn main() -> std::io::Result<()> {
         let state = web::Data::new(state.clone());
         App::new()
             .app_data(state)
-            .route("/signal",web::post().to(signal))
+            .route("/signal", web::post().to(signal))
     })
     .bind("0.0.0.0:33140")?
     .run()
