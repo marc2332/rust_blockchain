@@ -1,0 +1,1 @@
+This is a basic signal server to make possible the discovery of new nodes, this should theorically only be used the first time, then the node can just ask other nodes about more other nodes.

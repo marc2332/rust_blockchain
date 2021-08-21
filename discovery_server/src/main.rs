@@ -45,7 +45,7 @@ async fn signal(
             .insert(data.address.clone(), ip.to_string());
         serde_json::to_string(&state.lock().unwrap().signalers).unwrap()
     } else {
-        format!("failed")
+        "failed".to_string()
     }
 }
 

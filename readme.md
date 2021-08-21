@@ -1,4 +1,4 @@
-This projects intends to make possible to have distributed blockchain in which blocks authors are automatically picked based on facts all the nodes know, this makes it impossible to propagate "wrong" blocks.
+This projects intends to make possible to have distributed blockchain in which blocks authors are automatically picked based on facts all the nodes know, this makes it impossible to propagate "wrong" blocks among nodes that follow the protocol.
 
 WIP.
 

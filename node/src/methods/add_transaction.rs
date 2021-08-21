@@ -26,6 +26,7 @@ pub async fn add_transaction(
     state: &Arc<Mutex<NodeState>>,
     transaction: Transaction,
 ) -> Result<String> {
+    // Make the transaction signature, hash... is ok and that the funds can be spent
     let tx_verification_is_ok = transaction.verify()
         && state
             .lock()
@@ -37,6 +38,7 @@ pub async fn add_transaction(
     if tx_verification_is_ok {
         let mut state = state.lock().unwrap();
 
+        // Add the transaction to the memory pool
         state.mempool.add_transaction(transaction);
 
         // Minimum transactions per block are harcoded for now
@@ -47,7 +49,7 @@ pub async fn add_transaction(
              * If another node tries to propagate a block with a wrong forger it should be punished and ignored
              * WIP
              */
-            let _elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
+            let _elected_forger = consensus::elect_forger(&state.blockchain);
 
             let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 

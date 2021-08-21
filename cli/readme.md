@@ -1,0 +1,1 @@
+This is the CLI version of the node, the idea is to be able to pass configuration through some arguments.

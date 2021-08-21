@@ -9,6 +9,7 @@ async fn main() {
     // Connect to the node's RPC server
     let client = RPCClient::new("http://localhost:3030").await.unwrap();
 
+    // Sender wallet: This wallet should be created from the private key
     let wallet_a = Wallet::from_private(
         vec![
             45, 45, 45, 45, 45, 66, 69, 71, 73, 78, 32, 80, 82, 73, 86, 65, 84, 69, 32, 75, 69, 89,
@@ -60,8 +61,10 @@ async fn main() {
         ]
         .as_slice(),
     );
+    // Receiver wallet
     let wallet_b = Wallet::new();
 
+    // Build the transaction
     let sample_tx = TransactionBuilder::new()
         .key(&wallet_a.get_public())
         .from_address(&wallet_a.get_public().hash_it())
@@ -71,6 +74,7 @@ async fn main() {
         .sign_with(&wallet_a)
         .build();
 
+    // Send the transaction to a known node
     let res = client.add_transaction(sample_tx).await;
 
     println!("{:?}", res.unwrap());

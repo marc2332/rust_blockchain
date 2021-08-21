@@ -24,6 +24,10 @@ pub struct Block {
     pub index: Option<usize>,
 }
 
+pub enum BlocksErrors {
+    WrongHash,
+}
+
 impl Block {
     pub fn new(
         payload: &str,
@@ -49,7 +53,7 @@ impl Block {
         }
     }
 
-    pub fn verify_integrity(&self) -> Result<(), ()> {
+    pub fn verify_integrity(&self) -> Result<(), BlocksErrors> {
         let must_hash = BlockHash::new(
             self.payload.clone(),
             self.timestamp.clone(),
@@ -60,7 +64,7 @@ impl Block {
         if must_hash == self.hash {
             Ok(())
         } else {
-            Err(())
+            Err(BlocksErrors::WrongHash)
         }
     }
 
