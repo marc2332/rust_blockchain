@@ -788,7 +788,9 @@ name = "cli"
 version = "0.1.0"
 dependencies = [
  "blockchain",
+ "futures 0.3.16",
  "node",
+ "tokio 1.10.0",
 ]
 
 [[package]]

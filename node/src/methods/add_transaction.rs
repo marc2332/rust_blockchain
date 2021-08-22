@@ -49,23 +49,26 @@ pub async fn add_transaction(
              * If another node tries to propagate a block with a wrong forger it should be punished and ignored
              * WIP
              */
-            let _elected_forger = consensus::elect_forger(&state.blockchain);
+            let elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
 
-            let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
+            if elected_forger == state.wallet.get_public().hash_it() {
+                let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 
-            let new_block = BlockBuilder::new()
-                .payload(&block_data)
-                .timestamp(Utc::now())
-                .key(&state.wallet.get_public())
-                .previous_hash(&state.blockchain.last_block_hash.clone().unwrap())
-                .hash_it()
-                .sign_with(&state.wallet)
-                .build();
+                let new_block = BlockBuilder::new()
+                    .payload(&block_data)
+                    .timestamp(Utc::now())
+                    .key(&state.wallet.get_public())
+                    .previous_hash(&state.blockchain.last_block_hash.clone().unwrap())
+                    .hash_it()
+                    .sign_with(&state.wallet)
+                    .build();
+    
+                state.blockchain.add_block(&new_block);
+    
+                // Clear mempool
+                state.mempool.pending_transactions = Vec::new();
+            }
 
-            state.blockchain.add_block(&new_block);
-
-            // Clear mempool
-            state.mempool.pending_transactions = Vec::new();
         }
 
         Ok("Verified".to_string())

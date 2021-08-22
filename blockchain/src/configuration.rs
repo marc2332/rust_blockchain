@@ -1,13 +1,11 @@
-use crate::{
-    Block,
-    BlockchainErrors,
-};
+use crate::{Block, BlockchainErrors, Wallet};
 
 #[derive(Clone)]
 pub struct Configuration {
-    db: sled::Db,
+    pub db: sled::Db,
     pub rpc_port: u16,
     pub hostname: String,
+    pub wallet: Wallet
 }
 
 impl Configuration {
@@ -17,6 +15,17 @@ impl Configuration {
             db,
             rpc_port: 3030,
             hostname: "0.0.0.0".to_string(),
+            wallet: Wallet::default()
+        }
+    }
+
+    pub fn from_params(db_name: &str,rpc_port: u16, hostname: &str, wallet: Wallet) -> Self {
+        let db = sled::open(db_name).unwrap();
+        Self {
+            db,
+            rpc_port,
+            hostname: hostname.to_string(),
+            wallet
         }
     }
 

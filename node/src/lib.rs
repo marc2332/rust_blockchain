@@ -1,6 +1,5 @@
 use std::sync::{
     Arc,
-    Mutex,
 };
 
 use std::collections::HashMap;
@@ -15,6 +14,7 @@ use blockchain::{
 
 use chrono::Utc;
 use futures::executor::block_on;
+use futures::lock::Mutex;
 use jsonrpc_http_server::{
     jsonrpc_core::*,
     *,
@@ -54,7 +54,7 @@ pub trait RpcMethods {
 }
 
 struct RpcManager {
-    pub state: Arc<Mutex<NodeState>>,
+    pub state: Arc<std::sync::Mutex<NodeState>>,
 }
 
 impl RpcMethods for RpcManager {
@@ -86,6 +86,7 @@ pub struct NodeState {
     pub wallet: Wallet,
 }
 
+#[derive(Clone)]
 pub struct Node {}
 
 impl Default for Node {
@@ -99,11 +100,15 @@ impl Node {
         Self {}
     }
 
-    #[tokio::main]
     pub async fn run(&mut self, config: Arc<Mutex<Configuration>>) {
-        let mut blockchain = Blockchain::new("mars", config.clone());
 
-        let wallet = Wallet::default();
+        println!("Node starting...");
+
+        let config = config.lock().await;
+
+        let mut blockchain = Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
+
+        let wallet = config.wallet.clone();
 
         // Create a genesis block if there isn't
         if blockchain.last_block_hash.is_none() {
@@ -164,7 +169,7 @@ impl Node {
             }
         };
 
-        let state = Arc::new(Mutex::new(NodeState {
+        let state = Arc::new(std::sync::Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),
             peers,
@@ -179,8 +184,7 @@ impl Node {
 
         io.extend_with(manager.to_delegate());
 
-        let config = config.lock().unwrap();
-
+        
         let hostname = config.hostname.clone();
         let rpc_port = config.rpc_port;
 

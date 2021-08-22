@@ -16,6 +16,7 @@ use crate::{
     SignVerifier,
 };
 
+#[derive(Clone)]
 pub struct Wallet {
     pub keypair: PKey<Private>,
 }

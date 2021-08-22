@@ -1,7 +1,11 @@
-use blockchain::{
-    Blockchain,
-    Transaction,
+use crypto::{
+    digest::Digest,
+    sha3::{
+        Sha3,
+        Sha3Mode,
+    },
 };
+use blockchain::{Blockchain, Transaction};
 
 #[derive(Debug)]
 pub enum ConsensusErrors {
@@ -11,7 +15,7 @@ pub enum ConsensusErrors {
 /*
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
-pub fn elect_forger(blockchain: &Blockchain) -> Result<Transaction, ConsensusErrors> {
+pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> {
     let mut stakings = Vec::<Transaction>::new();
     for (i, block) in blockchain.iter().enumerate() {
         if i + 100 >= blockchain.chain.len() {
@@ -32,27 +36,30 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Transaction, ConsensusErr
         }
     }
 
-    /*
-
-    use crypto::{
-        digest::Digest,
-        sha3::{
-            Sha3,
-            Sha3Mode,
-        },
+    let txs_hash = {
+        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+        for tx in &stakings {
+            hasher.input_str(tx.signature.hash_it().as_str());
+        }
+        hasher.result_str()
     };
 
-    let elected_forger = {
-        let txs_hash = {
-            let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-            for tx in stakings {
-                hasher.input_str(tx.signature.hash_it().as_str());
+    let mut len = txs_hash.len();
+    let mut forger = None;
+
+    while len > 0 {
+        for tx in &stakings {
+            if tx.hash.contains(&txs_hash[0..len]) {
+                forger = Some(tx.clone().from_address);
+                break;
             }
-            hasher.result_str()
-        };
-    };
-    */
+            len -= 1;
+        }
+        if forger.is_some() {
+            break;
+        }
+    }
 
-    // Wip, just to make it not complain
-    Err(ConsensusErrors::TransactionBroken)
+
+    Ok(forger.unwrap())
 }

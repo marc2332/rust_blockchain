@@ -1,13 +1,12 @@
 use blockchain::Configuration;
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use futures::lock::Mutex;
+use std::sync::Arc;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut node = node::Node::new();
 
     let config = Arc::new(Mutex::new(Configuration::new()));
 
-    node.run(config);
+    node.run(config).await;
 }
