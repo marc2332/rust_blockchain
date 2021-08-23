@@ -1,20 +1,16 @@
-use std::sync::{
-    Arc,
-};
+#![feature(async_closure)]
+use std::sync::Arc;
 
 use std::collections::HashMap;
 
 use blockchain::{
-    BlockBuilder,
+    Block,
     Blockchain,
     Configuration,
-    TransactionBuilder,
     Wallet,
 };
 
-use chrono::Utc;
 use futures::executor::block_on;
-use futures::lock::Mutex;
 use jsonrpc_http_server::{
     jsonrpc_core::*,
     *,
@@ -26,6 +22,7 @@ pub mod mempool;
 pub mod methods;
 
 use methods::{
+    add_block,
     add_transaction,
     get_chain_length,
     make_handshake,
@@ -51,6 +48,9 @@ pub trait RpcMethods {
 
     #[rpc(name = "add_transaction")]
     fn add_transaction(&self, transaction: Transaction) -> Result<String>;
+
+    #[rpc(name = "add_block")]
+    fn add_block(&self, block: Block) -> Result<String>;
 }
 
 struct RpcManager {
@@ -72,6 +72,10 @@ impl RpcMethods for RpcManager {
     fn add_transaction(&self, transaction: Transaction) -> Result<String> {
         block_on(add_transaction(&self.state, transaction))
     }
+
+    fn add_block(&self, block: Block) -> Result<String> {
+        block_on(add_block(&self.state, block))
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -81,7 +85,7 @@ impl Metadata for ReqInfo {}
 
 pub struct NodeState {
     pub blockchain: Blockchain,
-    pub peers: HashMap<String, String>,
+    pub peers: HashMap<String, (String, u16)>,
     pub mempool: Mempool,
     pub wallet: Wallet,
 }
@@ -100,56 +104,18 @@ impl Node {
         Self {}
     }
 
-    pub async fn run(&mut self, config: Arc<Mutex<Configuration>>) {
+    pub async fn run(&mut self, config: Configuration) {
+        println!("[ INFO ] Node starting on {}", config.rpc_port);
 
-        println!("Node starting...");
-
-        let config = config.lock().await;
-
-        let mut blockchain = Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
+        let blockchain = Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
 
         let wallet = config.wallet.clone();
-
-        // Create a genesis block if there isn't
-        if blockchain.last_block_hash.is_none() {
-            println!("{:?}", wallet.get_private().0);
-
-            let genesis_transaction = TransactionBuilder::new()
-                .key(&wallet.get_public())
-                .from_address("0x")
-                .to_address(&wallet.get_public().hash_it())
-                .ammount(100)
-                .hash_it()
-                .sign_with(&wallet)
-                .build();
-
-            let staking_transaction = TransactionBuilder::new()
-                .key(&wallet.get_public())
-                .from_address(&wallet.get_public().hash_it())
-                .to_address("stake")
-                .ammount(5)
-                .hash_it()
-                .sign_with(&wallet)
-                .build();
-
-            let block_data =
-                serde_json::to_string(&vec![genesis_transaction, staking_transaction]).unwrap();
-
-            let genesis_block = BlockBuilder::new()
-                .payload(&block_data)
-                .timestamp(Utc::now())
-                .key(&wallet.get_public())
-                .hash_it()
-                .sign_with(&wallet)
-                .build();
-
-            blockchain.add_block(&genesis_block);
-        }
 
         let sign = wallet.sign_data(wallet.get_public().hash_it());
 
         let obj = serde_json::json!({
             "address": wallet.get_public().hash_it(),
+            "port": config.rpc_port,
             "key": wallet.get_public(),
             "sign": sign,
         });
@@ -164,7 +130,7 @@ impl Node {
                 .await;
 
             match res {
-                Ok(res) => res.json::<HashMap<String, String>>().await.unwrap(),
+                Ok(res) => res.json::<HashMap<String, (String, u16)>>().await.unwrap(),
                 _ => HashMap::new(),
             }
         };
@@ -176,7 +142,7 @@ impl Node {
             wallet,
         }));
 
-        assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
+        //assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
 
         let mut io = MetaIoHandler::default();
 
@@ -184,20 +150,18 @@ impl Node {
 
         io.extend_with(manager.to_delegate());
 
-        
         let hostname = config.hostname.clone();
         let rpc_port = config.rpc_port;
 
-        drop(config);
-
-        tokio::spawn(async move {
+        tokio::task::spawn_blocking(move || {
             let server = ServerBuilder::new(io)
                 .cors(DomainsValidation::AllowOnly(vec![
                     AccessControlAllowOrigin::Null,
                 ]))
-                .meta_extractor(|_req: &hyper::Request<hyper::Body>| ReqInfo(String::from("_")))
                 .start_http(&format!("{}:{}", hostname, rpc_port).parse().unwrap())
                 .expect("Unable to start RPC server");
+
+            println!("[ RPC ] Running on port {}", rpc_port);
 
             server.wait();
         })

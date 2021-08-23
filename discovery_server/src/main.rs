@@ -25,6 +25,7 @@ use std::{
 #[derive(Serialize, Deserialize, Clone)]
 struct SignalRequest {
     address: String,
+    port: u16,
     key: Key,
     sign: Key,
 }
@@ -42,7 +43,7 @@ async fn signal(
             .lock()
             .unwrap()
             .signalers
-            .insert(data.address.clone(), ip.to_string());
+            .insert(data.address.clone(), (ip.to_string(), data.port));
         serde_json::to_string(&state.lock().unwrap().signalers).unwrap()
     } else {
         "failed".to_string()
@@ -51,7 +52,7 @@ async fn signal(
 
 #[derive(Default)]
 struct State {
-    signalers: HashMap<String, String>,
+    signalers: HashMap<String, (String, u16)>,
 }
 
 #[actix_web::main]

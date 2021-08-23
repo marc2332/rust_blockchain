@@ -78,15 +78,13 @@ impl Blockchain {
         if db_result.is_ok() {
             self.chain.push(block.clone());
 
-            self.last_block_hash = Some(block.hash.clone());
+            self.last_block_hash = Some(block.hash);
         } else {
             // WIP
             println!("error");
         }
 
         assert!(self.verify_integrity().is_ok());
-
-        println!("Added block {}", &block.hash.unite());
     }
 
     /*

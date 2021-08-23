@@ -1,3 +1,7 @@
+use blockchain::{
+    Blockchain,
+    Transaction,
+};
 use crypto::{
     digest::Digest,
     sha3::{
@@ -5,7 +9,6 @@ use crypto::{
         Sha3Mode,
     },
 };
-use blockchain::{Blockchain, Transaction};
 
 #[derive(Debug)]
 pub enum ConsensusErrors {
@@ -59,7 +62,6 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
             break;
         }
     }
-
 
     Ok(forger.unwrap())
 }

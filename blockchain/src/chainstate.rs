@@ -83,7 +83,7 @@ impl Chainstate {
         } else {
             self.addresses.insert(tx.to_address.clone(), tx.ammount);
         }
-
+        /*
         println!(
             "\nFrom: {} has {}",
             tx.from_address,
@@ -94,5 +94,6 @@ impl Chainstate {
             tx.to_address,
             self.addresses.get(&tx.to_address.clone()).unwrap()
         );
+        */
     }
 }

@@ -1,4 +1,7 @@
-use blockchain::Transaction;
+use blockchain::{
+    Block,
+    Transaction,
+};
 use jsonrpc_client_transports::{
     transports::http,
     RpcChannel,
@@ -36,5 +39,8 @@ impl RPCClient {
     ) -> impl Future<Output = RpcResult<String>> {
         self.0
             .call_method("add_transaction", "String", (transaction,))
+    }
+    pub fn add_block(&self, block: Block) -> impl Future<Output = RpcResult<String>> {
+        self.0.call_method("add_block", "String", (block,))
     }
 }

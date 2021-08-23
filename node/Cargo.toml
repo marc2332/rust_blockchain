@@ -17,12 +17,12 @@ openssl = "0.10.35"
 rust-crypto = "0.2.36"
 consensus = { path = "../consensus"}
 reqwest = {version="0.11.4", features = ["json"] }
+client = { path = "../client"}
 
 [dev-dependencies]
 actix-rt = "2.2.0"
-client = { path = "../client"}
 criterion = "0.3.5"
-tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}
+tokio = { version = "1.9.0", features = ["full"]}
 
 [[bench]]
 name = "transactions"

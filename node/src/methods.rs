@@ -1,7 +1,9 @@
+mod add_block;
 mod add_transaction;
 mod get_chain_length;
 mod make_handshake;
 
+pub use add_block::add_block;
 pub use add_transaction::{
     add_transaction,
     TransactionResult,

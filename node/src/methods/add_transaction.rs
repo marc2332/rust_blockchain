@@ -52,7 +52,8 @@ pub async fn add_transaction(
             let elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
 
             if elected_forger == state.wallet.get_public().hash_it() {
-                let block_data = serde_json::to_string(&state.mempool.pending_transactions).unwrap();
+                let block_data =
+                    serde_json::to_string(&state.mempool.pending_transactions).unwrap();
 
                 let new_block = BlockBuilder::new()
                     .payload(&block_data)
@@ -62,13 +63,12 @@ pub async fn add_transaction(
                     .hash_it()
                     .sign_with(&state.wallet)
                     .build();
-    
+
                 state.blockchain.add_block(&new_block);
-    
+
                 // Clear mempool
                 state.mempool.pending_transactions = Vec::new();
             }
-
         }
 
         Ok("Verified".to_string())

@@ -1,11 +1,15 @@
-use crate::{Block, BlockchainErrors, Wallet};
+use crate::{
+    Block,
+    BlockchainErrors,
+    Wallet,
+};
 
 #[derive(Clone)]
 pub struct Configuration {
     pub db: sled::Db,
     pub rpc_port: u16,
     pub hostname: String,
-    pub wallet: Wallet
+    pub wallet: Wallet,
 }
 
 impl Configuration {
@@ -15,17 +19,17 @@ impl Configuration {
             db,
             rpc_port: 3030,
             hostname: "0.0.0.0".to_string(),
-            wallet: Wallet::default()
+            wallet: Wallet::default(),
         }
     }
 
-    pub fn from_params(db_name: &str,rpc_port: u16, hostname: &str, wallet: Wallet) -> Self {
+    pub fn from_params(db_name: &str, rpc_port: u16, hostname: &str, wallet: Wallet) -> Self {
         let db = sled::open(db_name).unwrap();
         Self {
             db,
             rpc_port,
             hostname: hostname.to_string(),
-            wallet
+            wallet,
         }
     }
 
@@ -57,7 +61,6 @@ impl Configuration {
                     let block: Block = block;
 
                     if block.verify_integrity().is_ok() {
-                        println!("Loaded block {}", &block.hash.unite());
                         chain.push(block)
                     } else {
                         return Err(BlockchainErrors::InvalidHash);
@@ -90,6 +93,7 @@ impl Configuration {
         );
 
         if result.is_ok() {
+            println!("{} Loaded block {}", self.rpc_port, &block.hash.unite());
             Ok(())
         } else {
             Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))
