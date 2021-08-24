@@ -1,3 +1,20 @@
-pub fn make_handshake<T>(_req_info: T) {
-    println!("Handshaked by another peer!")
+use crate::NodeState;
+use client::HandshakeRequest;
+use std::sync::{
+    Arc,
+    Mutex,
+};
+
+pub fn make_handshake(state: &Arc<Mutex<NodeState>>, req: HandshakeRequest) {
+    state
+        .lock()
+        .unwrap()
+        .peers
+        .insert(req.address, (req.ip.clone(), req.port));
+    log::info!(
+        "(Node.{}) Handshaked by {}:{}",
+        state.lock().unwrap().id,
+        req.ip,
+        req.port
+    );
 }

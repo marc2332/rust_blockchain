@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+#![feature(slice_pattern)]
 use blockchain::{
     BlockBuilder,
     Blockchain,
@@ -8,14 +7,25 @@ use blockchain::{
     Wallet,
 };
 use chrono::Utc;
+use client::RPCClient;
 use futures::future::join_all;
 use jsonrpc_core::serde_json;
+use log::LevelFilter;
 use node::Node;
+use simple_logger::SimpleLogger;
+use std::{
+    sync::Arc,
+    thread,
+    time,
+};
 
 fn create_nodes() -> Vec<(Node, Configuration)> {
     (0..15)
         .map(|i| {
+            std::fs::remove_dir_all(&format!("db_{}", i)).ok();
+
             let config = Configuration::from_params(
+                i,
                 &format!("db_{}", i),
                 3030 + i,
                 "0.0.0.0",
@@ -34,6 +44,15 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
  */
 #[tokio::main]
 async fn main() {
+    SimpleLogger::new()
+        .with_timestamps(false)
+        .with_colors(true)
+        .with_level(LevelFilter::Off)
+        .with_module_level("node", LevelFilter::Info)
+        .with_module_level("blockchain", LevelFilter::Info)
+        .init()
+        .unwrap();
+
     let nodes = create_nodes();
 
     let mut nodes_runtimes = Vec::new();
@@ -87,6 +106,30 @@ async fn main() {
             node.run(config).await;
         }));
     }
+
+    tokio::spawn(async move {
+        let delay = time::Duration::from_millis(3500);
+        thread::sleep(delay);
+
+        let client = RPCClient::new("http://localhost:3030").await.unwrap();
+
+        let wallet_b = Wallet::new();
+
+        // Build the transaction
+        let sample_tx = TransactionBuilder::new()
+            .key(&wallet.get_public())
+            .from_address(&wallet.get_public().hash_it())
+            .to_address(&wallet_b.get_public().hash_it())
+            .ammount(1)
+            .hash_it()
+            .sign_with(&wallet)
+            .build();
+
+        // Send the transaction to a known node
+        let res = client.add_transaction(sample_tx).await;
+
+        println!("{:?}", res.unwrap());
+    });
 
     join_all(nodes_runtimes).await;
 }

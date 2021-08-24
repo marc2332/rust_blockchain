@@ -11,6 +11,7 @@ use crate::{
     Transaction,
 };
 
+#[derive(Clone)]
 pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
     pub addresses: HashMap<String, u64>,

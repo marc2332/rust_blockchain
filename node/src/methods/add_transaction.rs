@@ -4,6 +4,7 @@ use std::sync::{
 };
 
 use chrono::Utc;
+use client::RPCClient;
 use serde::{
     Deserialize,
     Serialize,
@@ -15,7 +16,10 @@ pub enum TransactionResult {
     BadVerification,
 }
 
-use crate::NodeState;
+use crate::{
+    tokio,
+    NodeState,
+};
 use blockchain::{
     BlockBuilder,
     Transaction,
@@ -68,6 +72,19 @@ pub async fn add_transaction(
 
                 // Clear mempool
                 state.mempool.pending_transactions = Vec::new();
+
+                for (hostname, port) in state.peers.values() {
+                    let hostname = hostname.clone();
+                    let port = *port;
+                    let new_block = new_block.clone();
+
+                    tokio::spawn(async move {
+                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                            .await
+                            .unwrap();
+                        client.add_block(new_block).await.unwrap();
+                    });
+                }
             }
         }
 

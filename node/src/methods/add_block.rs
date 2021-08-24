@@ -8,10 +8,9 @@ use blockchain::{
     Block,
     Transaction,
 };
-use client::RPCClient;
 use jsonrpc_http_server::jsonrpc_core::*;
 
-pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) -> Result<String> {
+pub fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) -> Result<String> {
     let mut state = state.lock().unwrap();
 
     let is_block_ok = || {
@@ -37,16 +36,9 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) -> Result<St
 
         state.mempool.pending_transactions.clear();
 
-        for (hostname, port) in state.peers.values() {
-            let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                .await
-                .unwrap();
-            client.add_block(block.clone()).await.unwrap();
-        }
-
+        // WIP
         Ok(String::from("ok"))
     } else {
-        println!("err");
         Ok(String::from("err"))
     }
 }

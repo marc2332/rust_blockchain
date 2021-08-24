@@ -10,3 +10,9 @@ WIP.
 | consensus        | Dummy POW utilities (not really used)                                                       |
 | discovery_server | A signaling server for nodes to find each other                                             |
 | cli              | CLI Runner of a Node                                                                        |
+
+Run simulation (WIP):
+```shell
+cd node
+cargo run --example simulation
+```

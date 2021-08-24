@@ -12,6 +12,7 @@ jsonrpc-core-client = "18.0.0"
 jsonrpc-client-transports = "18.0.0"
 blockchain = { path = "../blockchain"}
 rust-crypto = "0.2.36"
+serde = { version = "1.0.127", features = ["derive"] }
 
 [dev-dependencies]
 tokio = { version = "1.9.0", features = ["rt-multi-thread", "macros"]}

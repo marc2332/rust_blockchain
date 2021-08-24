@@ -6,6 +6,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Configuration {
+    pub id: u16,
     pub db: sled::Db,
     pub rpc_port: u16,
     pub hostname: String,
@@ -16,6 +17,7 @@ impl Configuration {
     pub fn new() -> Self {
         let db = sled::open("db").unwrap();
         Self {
+            id: 0,
             db,
             rpc_port: 3030,
             hostname: "0.0.0.0".to_string(),
@@ -23,9 +25,16 @@ impl Configuration {
         }
     }
 
-    pub fn from_params(db_name: &str, rpc_port: u16, hostname: &str, wallet: Wallet) -> Self {
+    pub fn from_params(
+        id: u16,
+        db_name: &str,
+        rpc_port: u16,
+        hostname: &str,
+        wallet: Wallet,
+    ) -> Self {
         let db = sled::open(db_name).unwrap();
         Self {
+            id,
             db,
             rpc_port,
             hostname: hostname.to_string(),
@@ -93,7 +102,6 @@ impl Configuration {
         );
 
         if result.is_ok() {
-            println!("{} Loaded block {}", self.rpc_port, &block.hash.unite());
             Ok(())
         } else {
             Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))

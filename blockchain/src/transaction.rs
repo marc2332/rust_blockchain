@@ -16,7 +16,7 @@ use serde::{
     Serialize,
 };
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Transaction {
     pub author_public_key: Key,
     pub signature: Key,

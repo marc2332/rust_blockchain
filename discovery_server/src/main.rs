@@ -30,6 +30,9 @@ struct SignalRequest {
     sign: Key,
 }
 
+/*
+ * Register requester's public address, IP and port into a not-permament hashmap
+ */
 async fn signal(
     data: web::Json<SignalRequest>,
     req: HttpRequest,
@@ -37,13 +40,12 @@ async fn signal(
 ) -> impl Responder {
     let public_address = PublicAddress::from(&data.key);
     if public_address.verify_signature(&data.sign, data.address.clone()) {
-        let req_info = req.connection_info();
-        let ip = req_info.host();
+        let ip = req.peer_addr().unwrap().ip().to_string();
         state
             .lock()
             .unwrap()
             .signalers
-            .insert(data.address.clone(), (ip.to_string(), data.port));
+            .insert(data.address.clone(), (ip, data.port));
         serde_json::to_string(&state.lock().unwrap().signalers).unwrap()
     } else {
         "failed".to_string()

@@ -11,6 +11,18 @@ use jsonrpc_client_transports::{
 };
 use std::future::Future;
 
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
+#[derive(Serialize, Deserialize)]
+pub struct HandshakeRequest {
+    pub address: String,
+    pub ip: String,
+    pub port: u16,
+}
+
 #[derive(Clone)]
 pub struct RPCClient(TypedClient);
 
@@ -30,8 +42,8 @@ impl RPCClient {
     pub fn get_chain_length(&self) -> impl Future<Output = RpcResult<usize>> {
         self.0.call_method("get_chain_length", "Number", ())
     }
-    pub fn make_handshake(&self) -> impl Future<Output = RpcResult<()>> {
-        self.0.call_method("make_handshake", "()", ())
+    pub fn make_handshake(&self, req: HandshakeRequest) -> impl Future<Output = RpcResult<()>> {
+        self.0.call_method("make_handshake", "()", (req,))
     }
     pub fn add_transaction(
         &self,

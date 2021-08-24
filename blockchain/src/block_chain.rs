@@ -12,6 +12,7 @@ use crate::{
     Transaction,
 };
 
+#[derive(Clone)]
 pub struct Blockchain {
     pub name: String,
     pub chain: Vec<Block>,
@@ -33,6 +34,11 @@ pub enum BlockchainErrors {
 impl Blockchain {
     pub fn new(name: &str, config: Arc<Mutex<Configuration>>) -> Self {
         let chain = config.lock().unwrap().get_blocks(name).unwrap();
+
+        log::info!(
+            "(Node.{}) Loaded blockchain from database",
+            config.lock().unwrap().id
+        );
 
         let index = chain.len() as usize;
 
@@ -72,19 +78,47 @@ impl Blockchain {
             self.state.effect_transaction(tx);
         }
 
-        // Add the block to the database
-        let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
+        // Make sure that adding the block to the chain won't break it's integrity
+        let block_can_be_added = {
+            /*
+             * If the last chain hash is the same as the new block hash that means that the block was already added,
+             * so there is not need to verify the complete integrity of the chain
+             */
+            if self.last_block_hash.as_ref() == Some(&block.hash) {
+                false
+            } else {
+                let mut temp_chain = self.chain.clone();
+                temp_chain.push(block.clone());
+                let can_be_added = verify_integrity(&temp_chain).is_ok();
+                if !can_be_added {
+                    log::warn!(
+                        "(Node.{}) Tried to add a faulty block to the chain.",
+                        self.config.lock().unwrap().id
+                    );
+                }
+                can_be_added
+            }
+        };
 
-        if db_result.is_ok() {
-            self.chain.push(block.clone());
+        if block_can_be_added {
+            // Add the block to the database
+            let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
 
-            self.last_block_hash = Some(block.hash);
-        } else {
-            // WIP
-            println!("error");
+            if db_result.is_ok() {
+                self.chain.push(block.clone());
+                self.last_block_hash = Some(block.hash.clone());
+                log::info!(
+                    "(Node.{}) Added block -> {:?}",
+                    self.config.lock().unwrap().id,
+                    block.hash.unite()
+                );
+            } else {
+                log::error!(
+                    "(Node.{}) Couldn't add the block to the database.",
+                    self.config.lock().unwrap().id
+                );
+            }
         }
-
-        assert!(self.verify_integrity().is_ok());
     }
 
     /*
@@ -105,32 +139,36 @@ impl Blockchain {
      * Verify the integrity of the blockchain
      */
     pub fn verify_integrity(&self) -> Result<(), BlockchainErrors> {
-        for (i, block) in self.chain.iter().enumerate() {
-            if i > 0 {
-                let previous_block = &self.chain[i - 1];
+        verify_integrity(&self.chain)
+    }
+}
 
-                /*
-                 * The previous hash must be the same as the previous block's hash
-                 */
-                let previous_hash = block.previous_hash.as_ref().unwrap();
-
-                if previous_hash.unite() != previous_block.hash.unite() {
-                    return Err(BlockchainErrors::InvalidPrevioushHash(
-                        previous_hash.hash.clone(),
-                        previous_block.hash.hash.clone(),
-                    ));
-                }
-            }
-
-            let block_signer = PublicAddress::from(&block.key);
+fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {
+    for (i, block) in chain.iter().enumerate() {
+        if i > 0 {
+            let previous_block = &chain[i - 1];
 
             /*
-             * The signature must be correct according the public key and the block data
+             * The previous hash must be the same as the previous block's hash
              */
-            if !block.verify_sign_with(&block_signer) {
-                return Err(BlockchainErrors::InvalidSignature);
+            let previous_hash = block.previous_hash.as_ref().unwrap();
+
+            if previous_hash.unite() != previous_block.hash.unite() {
+                return Err(BlockchainErrors::InvalidPrevioushHash(
+                    previous_hash.hash.clone(),
+                    previous_block.hash.hash.clone(),
+                ));
             }
         }
-        Ok(())
+
+        let block_signer = PublicAddress::from(&block.key);
+
+        /*
+         * The signature must be correct according the public key and the block data
+         */
+        if !block.verify_sign_with(&block_signer) {
+            return Err(BlockchainErrors::InvalidSignature);
+        }
     }
+    Ok(())
 }
