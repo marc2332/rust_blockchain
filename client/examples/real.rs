@@ -70,9 +70,9 @@ async fn main() {
         .from_address(&wallet_a.get_public().hash_it())
         .to_address(&wallet_b.get_public().hash_it())
         .ammount(1)
-        .hash_it()
+        .hash_movement()
         .sign_with(&wallet_a)
-        .build();
+        .build_movement();
 
     // Send the transaction to a known node
     let res = client.add_transaction(sample_tx).await;

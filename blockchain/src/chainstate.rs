@@ -43,14 +43,30 @@ impl Chainstate {
      * Make sure a transaction can be spent
      */
     pub fn verify_transaction_ammount(&self, tx: &Transaction) -> bool {
-        if tx.from_address != "0x" {
-            if let Some(address_amm) = &mut self.addresses.get(&tx.from_address.clone()) {
-                **address_amm >= tx.ammount
-            } else {
-                false
+        match tx {
+            Transaction::MOVEMENT {
+                from_address,
+                ammount,
+                ..
+            } => {
+                if let Some(address_amm) = &mut self.addresses.get(&from_address.clone()) {
+                    *address_amm >= ammount
+                } else {
+                    false
+                }
             }
-        } else {
-            true
+            Transaction::STAKE {
+                from_address,
+                ammount,
+                ..
+            } => {
+                if let Some(address_amm) = &mut self.addresses.get(&from_address.clone()) {
+                    *address_amm >= ammount
+                } else {
+                    false
+                }
+            }
+            Transaction::COINBASE { .. } => true,
         }
     }
 
@@ -58,43 +74,46 @@ impl Chainstate {
      * Apply the proper changes to the chainstate when a transaction is ocurred
      */
     pub fn effect_transaction(&mut self, tx: &Transaction) {
-        if tx.from_address != "0x" {
-            if let Some(address_amm) = self.addresses.get(&tx.from_address.clone()) {
-                // Address is loaded
-                if *address_amm >= tx.ammount {
-                    // Has enough ammount, OK
+        match tx {
+            Transaction::MOVEMENT {
+                from_address,
+                to_address,
+                ammount,
+                ..
+            } => {
+                if let Some(address_amm) = self.addresses.get(&from_address.clone()) {
+                    // Address is loaded
+                    if address_amm >= ammount {
+                        // Has enough ammount, OK
 
-                    #[allow(mutable_borrow_reservation_conflict)]
-                    self.addresses
-                        .insert(tx.from_address.clone(), address_amm - tx.ammount);
-
-                    if let Some(address_amm) = self.addresses.get(&tx.to_address.clone()) {
                         #[allow(mutable_borrow_reservation_conflict)]
                         self.addresses
-                            .insert(tx.to_address.clone(), *address_amm + tx.ammount);
-                    } else {
-                        self.addresses.insert(tx.to_address.clone(), tx.ammount);
+                            .insert(from_address.clone(), address_amm - ammount);
+
+                        if let Some(address_amm) = self.addresses.get(&to_address.clone()) {
+                            #[allow(mutable_borrow_reservation_conflict)]
+                            self.addresses
+                                .insert(to_address.clone(), *address_amm + ammount);
+                        } else {
+                            self.addresses.insert(to_address.clone(), *ammount);
+                        }
                     }
                 }
             }
-        } else if let Some(address_amm) = self.addresses.get(&tx.to_address.clone()) {
-            #[allow(mutable_borrow_reservation_conflict)]
-            self.addresses
-                .insert(tx.to_address.clone(), *address_amm + tx.ammount);
-        } else {
-            self.addresses.insert(tx.to_address.clone(), tx.ammount);
-        }
-        /*
-        println!(
-            "\nFrom: {} has {}",
-            tx.from_address,
-            self.addresses.get(&tx.from_address.clone()).unwrap_or(&0)
-        );
-        println!(
-            "To: {} has {}",
-            tx.to_address,
-            self.addresses.get(&tx.to_address.clone()).unwrap()
-        );
-        */
+            Transaction::COINBASE {
+                to_address,
+                ammount,
+                ..
+            } => {
+                if let Some(address_amm) = self.addresses.get(&to_address.clone()) {
+                    #[allow(mutable_borrow_reservation_conflict)]
+                    self.addresses
+                        .insert(to_address.clone(), *address_amm + ammount);
+                } else {
+                    self.addresses.insert(to_address.clone(), *ammount);
+                }
+            }
+            _ => {}
+        };
     }
 }

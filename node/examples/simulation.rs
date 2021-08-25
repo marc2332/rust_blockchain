@@ -60,22 +60,19 @@ async fn main() {
     let wallet = nodes[0].1.wallet.clone();
 
     let genesis_transaction = TransactionBuilder::new()
-        .key(&wallet.get_public())
-        .from_address("0x")
         .to_address(&wallet.get_public().hash_it())
-        .ammount(100)
-        .hash_it()
+        .ammount(500)
+        .hash_coinbase()
         .sign_with(&wallet)
-        .build();
+        .build_coinbase();
 
     let staking_transaction = TransactionBuilder::new()
         .key(&wallet.get_public())
         .from_address(&wallet.get_public().hash_it())
-        .to_address("stake")
         .ammount(5)
-        .hash_it()
+        .hash_stake()
         .sign_with(&wallet)
-        .build();
+        .build_stake();
 
     let block_data =
         serde_json::to_string(&vec![genesis_transaction, staking_transaction]).unwrap();
@@ -108,27 +105,32 @@ async fn main() {
     }
 
     tokio::spawn(async move {
-        let delay = time::Duration::from_millis(3500);
+        let delay = time::Duration::from_millis(2000);
         thread::sleep(delay);
 
         let client = RPCClient::new("http://localhost:3030").await.unwrap();
 
         let wallet_b = Wallet::new();
 
-        // Build the transaction
-        let sample_tx = TransactionBuilder::new()
-            .key(&wallet.get_public())
-            .from_address(&wallet.get_public().hash_it())
-            .to_address(&wallet_b.get_public().hash_it())
-            .ammount(1)
-            .hash_it()
-            .sign_with(&wallet)
-            .build();
+        for i in 0..90 {
+            // Build the transaction
+            let sample_tx = TransactionBuilder::new()
+                .key(&wallet.get_public())
+                .from_address(&wallet.get_public().hash_it())
+                .to_address(&wallet_b.get_public().hash_it())
+                .ammount(1)
+                .hash_movement()
+                .sign_with(&wallet)
+                .build_movement();
 
-        // Send the transaction to a known node
-        let res = client.add_transaction(sample_tx).await;
+            // Send the transaction to a known node
+            let res = client.add_transaction(sample_tx).await;
 
-        println!("{:?}", res.unwrap());
+            println!("{:?}", res.unwrap());
+
+            let delay = time::Duration::from_millis(20);
+            thread::sleep(delay);
+        }
     });
 
     join_all(nodes_runtimes).await;

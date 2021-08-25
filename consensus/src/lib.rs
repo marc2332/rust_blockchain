@@ -24,16 +24,18 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
         if i + 100 >= blockchain.chain.len() {
             let txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
-            for transaction in txs {
-                let tx_verification_is_ok = transaction.verify();
+            for tx in txs {
+                if let Transaction::STAKE { .. } = tx {
+                    let tx_verification_is_ok = tx.verify();
 
-                if tx_verification_is_ok {
-                    if transaction.to_address == "stake" && stakings.len() < 100 {
-                        stakings.push(transaction);
+                    if tx_verification_is_ok {
+                        if stakings.len() < 100 {
+                            stakings.push(tx);
+                        }
+                    } else {
+                        println!("Blockchain is broken.");
+                        return Err(ConsensusErrors::TransactionBroken);
                     }
-                } else {
-                    println!("Blockchain is broken.");
-                    return Err(ConsensusErrors::TransactionBroken);
                 }
             }
         }
@@ -42,7 +44,9 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
     let txs_hash = {
         let mut hasher = Sha3::new(Sha3Mode::Keccak256);
         for tx in &stakings {
-            hasher.input_str(tx.signature.hash_it().as_str());
+            if let Transaction::STAKE { signature, .. } = tx {
+                hasher.input_str(signature.hash_it().as_str());
+            }
         }
         hasher.result_str()
     };
@@ -52,9 +56,14 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
 
     while len > 0 {
         for tx in &stakings {
-            if tx.hash.contains(&txs_hash[0..len]) {
-                forger = Some(tx.clone().from_address);
-                break;
+            if let Transaction::STAKE {
+                from_address, hash, ..
+            } = tx
+            {
+                if hash.contains(&txs_hash[0..len]) {
+                    forger = Some(from_address);
+                    break;
+                }
             }
             len -= 1;
         }
@@ -63,5 +72,5 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
         }
     }
 
-    Ok(forger.unwrap())
+    Ok(forger.unwrap().to_string())
 }

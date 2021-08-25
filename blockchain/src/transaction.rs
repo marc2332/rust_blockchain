@@ -17,44 +17,129 @@ use serde::{
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Transaction {
-    pub author_public_key: Key,
-    pub signature: Key,
-    // The Hashed public key must be the same as the from_address
-    pub from_address: String,
-    pub to_address: String,
-    pub ammount: u64,
-    pub hash: String,
+pub enum Transaction {
+    MOVEMENT {
+        author_public_key: Key,
+        signature: Key,
+        from_address: String,
+        to_address: String,
+        ammount: u64,
+        hash: String,
+    },
+    COINBASE {
+        to_address: String,
+        ammount: u64,
+        hash: String,
+    },
+    STAKE {
+        author_public_key: Key,
+        signature: Key,
+        from_address: String,
+        ammount: u64,
+        hash: String,
+    },
 }
 
 impl Transaction {
     pub fn hash_it(&self) -> String {
-        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        hasher.input_str(&self.author_public_key.to_string());
-        hasher.input_str(&self.from_address);
-        hasher.input_str(&self.to_address);
-        hasher.input_str(&self.ammount.to_string());
-        hasher.result_str()
+        match self {
+            Transaction::MOVEMENT {
+                author_public_key,
+                from_address,
+                to_address,
+                ammount,
+                ..
+            } => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+                hasher.input_str(&author_public_key.to_string());
+                hasher.input_str(from_address);
+                hasher.input_str(to_address);
+                hasher.input_str(&ammount.to_string());
+                hasher.result_str()
+            }
+            Transaction::COINBASE {
+                to_address,
+                ammount,
+                ..
+            } => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+                hasher.input_str(to_address);
+                hasher.input_str(&ammount.to_string());
+                hasher.result_str()
+            }
+            Transaction::STAKE {
+                author_public_key,
+                from_address,
+                ammount,
+                ..
+            } => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+                hasher.input_str(&author_public_key.to_string());
+                hasher.input_str(from_address);
+                hasher.input_str(&ammount.to_string());
+                hasher.result_str()
+            }
+        }
     }
 
     pub fn verify(&self) -> bool {
-        let public_key_hashed = self.author_public_key.hash_it();
+        match self {
+            Transaction::MOVEMENT {
+                author_public_key,
+                signature,
+                from_address,
+                hash,
+                ..
+            } => {
+                let public_key_hashed = author_public_key.hash_it();
 
-        if self.from_address != "0x" {
-            // Ensure the hashed public key is the same as the from_address
-            if public_key_hashed != self.from_address {
-                return false;
+                // Ensure the hashed public key is the same as the from_address
+                if &public_key_hashed != from_address {
+                    return false;
+                }
+
+                // Make sure the hash is not altered
+                if &self.hash_it() != hash {
+                    return false;
+                }
+
+                // Verify the signature
+                let public_address = PublicAddress::from(author_public_key);
+
+                public_address.verify_signature(signature, hash.to_string())
+            }
+            Transaction::COINBASE { hash, .. } => {
+                // Make sure the hash is not altered
+                if &self.hash_it() != hash {
+                    return false;
+                }
+
+                true
+            }
+            Transaction::STAKE {
+                author_public_key,
+                signature,
+                from_address,
+                hash,
+                ..
+            } => {
+                let public_key_hashed = author_public_key.hash_it();
+
+                // Ensure the hashed public key is the same as the from_address
+                if &public_key_hashed != from_address {
+                    return false;
+                }
+
+                // Make sure the hash is not altered
+                if &self.hash_it() != hash {
+                    return false;
+                }
+
+                // Verify the signature
+                let public_address = PublicAddress::from(author_public_key);
+
+                public_address.verify_signature(signature, hash.to_string())
             }
         }
-
-        // Make sure the hash is not altered
-        if self.hash_it() != self.hash {
-            return false;
-        }
-
-        // Verify the signature
-        let public_address = PublicAddress::from(&self.author_public_key);
-
-        public_address.verify_signature(&self.signature, self.hash.to_string())
     }
 }

@@ -46,7 +46,7 @@ pub async fn add_transaction(
         state.mempool.add_transaction(transaction);
 
         // Minimum transactions per block are harcoded for now
-        if !state.mempool.pending_transactions.is_empty() {
+        if !state.mempool.pending_transactions.len() > 10 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes

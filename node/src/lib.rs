@@ -124,10 +124,15 @@ impl Node {
                 .send()
                 .await;
 
-            match res {
+            let mut peers = match res {
                 Ok(res) => res.json::<HashMap<String, (String, u16)>>().await.unwrap(),
                 _ => HashMap::new(),
+            };
+            let address = wallet.get_private().hash_it();
+            if peers.get(&address).is_some()  {
+                peers.remove(&address);
             }
+            peers
         };
 
         let state = Arc::new(std::sync::Mutex::new(NodeState {

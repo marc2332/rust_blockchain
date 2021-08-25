@@ -41,12 +41,13 @@ async fn signal(
     let public_address = PublicAddress::from(&data.key);
     if public_address.verify_signature(&data.sign, data.address.clone()) {
         let ip = req.peer_addr().unwrap().ip().to_string();
+        let response = serde_json::to_string(&state.lock().unwrap().signalers).unwrap();
         state
             .lock()
             .unwrap()
             .signalers
             .insert(data.address.clone(), (ip, data.port));
-        serde_json::to_string(&state.lock().unwrap().signalers).unwrap()
+        response
     } else {
         "failed".to_string()
     }

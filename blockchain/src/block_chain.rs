@@ -92,8 +92,9 @@ impl Blockchain {
                 let can_be_added = verify_integrity(&temp_chain).is_ok();
                 if !can_be_added {
                     log::warn!(
-                        "(Node.{}) Tried to add a faulty block to the chain.",
-                        self.config.lock().unwrap().id
+                        "(Node.{}) Tried to add a faulty block ({}) to the chain.",
+                        self.config.lock().unwrap().id,
+                        block.hash.unite()
                     );
                 }
                 can_be_added
