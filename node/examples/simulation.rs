@@ -61,7 +61,7 @@ async fn main() {
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&wallet.get_public().hash_it())
-        .ammount(500)
+        .ammount(500000)
         .hash_coinbase()
         .sign_with(&wallet)
         .build_coinbase();
@@ -93,15 +93,17 @@ async fn main() {
 
         // Create a genesis block if there isn't
         if blockchain.last_block_hash.is_none() {
-            blockchain.add_block(&genesis_block);
+            blockchain.add_block(&genesis_block).unwrap();
             /*
              * All other 14 nodes should also stake a small ammount to be able to participate in forgint the next block
              */
         }
-        nodes_runtimes.push(tokio::spawn(async move {
-            let mut node = node.clone();
-            node.run(config).await;
-        }));
+        if nodes_runtimes.len() < 15 {
+            nodes_runtimes.push(tokio::spawn(async move {
+                let mut node = node.clone();
+                node.run(config).await;
+            }));
+        }
     }
 
     tokio::spawn(async move {
@@ -112,7 +114,7 @@ async fn main() {
 
         let wallet_b = Wallet::new();
 
-        for i in 0..90 {
+        for _ in 0..200000 {
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
                 .key(&wallet.get_public())
@@ -123,13 +125,11 @@ async fn main() {
                 .sign_with(&wallet)
                 .build_movement();
 
-            // Send the transaction to a known node
+            let client = client.clone();
+
             let res = client.add_transaction(sample_tx).await;
 
-            println!("{:?}", res.unwrap());
-
-            let delay = time::Duration::from_millis(20);
-            thread::sleep(delay);
+            println!("{:?}", res);
         }
     });
 

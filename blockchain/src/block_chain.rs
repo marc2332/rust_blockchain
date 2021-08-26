@@ -65,7 +65,7 @@ impl Blockchain {
     /*
      * Append a block to the chain
      */
-    pub fn add_block(&mut self, block: &Block) {
+    pub fn add_block(&mut self, block: &Block) -> Result<(), BlockchainErrors> {
         self.index += 1;
 
         let mut block = block.clone();
@@ -113,12 +113,16 @@ impl Blockchain {
                     self.config.lock().unwrap().id,
                     block.hash.unite()
                 );
+                Ok(())
             } else {
                 log::error!(
                     "(Node.{}) Couldn't add the block to the database.",
                     self.config.lock().unwrap().id
                 );
+                Err(BlockchainErrors::CouldntAddBlock(block.hash.unite()))
             }
+        } else {
+            Err(BlockchainErrors::CouldntAddBlock(block.hash.unite()))
         }
     }
 

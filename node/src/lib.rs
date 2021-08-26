@@ -76,6 +76,7 @@ impl RpcMethods for RpcManager {
 
 pub struct NodeState {
     pub blockchain: Blockchain,
+    pub lost_blocks: HashMap<String, Block>,
     pub peers: HashMap<String, (String, u16)>,
     pub mempool: Mempool,
     pub wallet: Wallet,
@@ -129,7 +130,7 @@ impl Node {
                 _ => HashMap::new(),
             };
             let address = wallet.get_private().hash_it();
-            if peers.get(&address).is_some()  {
+            if peers.get(&address).is_some() {
                 peers.remove(&address);
             }
             peers
@@ -139,6 +140,7 @@ impl Node {
             blockchain,
             mempool: Mempool::default(),
             peers: peers.clone(),
+            lost_blocks: HashMap::new(),
             wallet: wallet.clone(),
             id: config.id,
         }));

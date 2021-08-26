@@ -46,7 +46,7 @@ pub async fn add_transaction(
         state.mempool.add_transaction(transaction);
 
         // Minimum transactions per block are harcoded for now
-        if !state.mempool.pending_transactions.len() > 10 {
+        if state.mempool.pending_transactions.len() > 100 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -68,10 +68,10 @@ pub async fn add_transaction(
                     .sign_with(&state.wallet)
                     .build();
 
-                state.blockchain.add_block(&new_block);
+                state.blockchain.add_block(&new_block).unwrap();
 
                 // Clear mempool
-                state.mempool.pending_transactions = Vec::new();
+                state.mempool.pending_transactions.clear();
 
                 for (hostname, port) in state.peers.values() {
                     let hostname = hostname.clone();
