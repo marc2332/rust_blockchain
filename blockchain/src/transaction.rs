@@ -41,6 +41,15 @@ pub enum Transaction {
 }
 
 impl Transaction {
+    pub fn get_hash(&self) -> String {
+        match self {
+            Transaction::MOVEMENT { hash, .. } => hash,
+            Transaction::COINBASE { hash, .. } => hash,
+            Transaction::STAKE { hash, .. } => hash,
+        }
+        .to_string()
+    }
+
     pub fn hash_it(&self) -> String {
         match self {
             Transaction::MOVEMENT {

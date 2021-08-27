@@ -19,7 +19,7 @@ impl Configuration {
         Self {
             id: 0,
             db,
-            rpc_port: 3030,
+            rpc_port: 2000,
             hostname: "0.0.0.0".to_string(),
             wallet: Wallet::default(),
         }

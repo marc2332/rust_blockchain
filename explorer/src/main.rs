@@ -55,6 +55,8 @@ use tui::{
     Terminal,
 };
 
+use std::time;
+
 enum Event<I> {
     Input(I),
     Tick,
@@ -64,14 +66,14 @@ enum Event<I> {
 #[derive(Debug, FromArgs)]
 struct Cli {
     /// time in ms between two ticks.
-    #[argh(option, default = "50")]
+    #[argh(option, default = "250")]
     tick_rate: u64,
     /// whether unicode symbols are used to improve the overall look of the app
     #[argh(option, default = "true")]
     enhanced_graphics: bool,
 }
 
-fn nodes_list(f: &mut Frame<CrosstermBackend<Stdout>>, data: Vec<String>) {
+fn nodes_list(f: &mut Frame<CrosstermBackend<Stdout>>, data: Vec<usize>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -92,11 +94,11 @@ fn nodes_list(f: &mut Frame<CrosstermBackend<Stdout>>, data: Vec<String>) {
         .split(f.size());
 
     for i in 0..10 {
-        let paragraph = Paragraph::new(data[i].clone())
+        let paragraph = Paragraph::new("█".repeat(data[i]))
             .style(Style::default().fg(Color::White))
             .block(
                 Block::default()
-                    .title(format!("node {} ({})", i + 1, data[i].len()))
+                    .title(format!("node {} ({})", i, data[i].to_string()))
                     .borders(Borders::ALL),
             )
             .alignment(Alignment::Left)
@@ -142,24 +144,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     terminal.clear()?;
-    let data = Arc::new(Mutex::new(vec![String::from("-"); 10]));
+    let data = Arc::new(Mutex::new(vec![0; 10]));
     for i in 0..10 {
         let data = data.clone();
         tokio::spawn(async move {
             loop {
-                let client = RPCClient::new(&format!("http://localhost:{}", 3030 + i))
+                let client = RPCClient::new(&format!("http://localhost:{}", 2000 + i))
                     .await
                     .unwrap();
-                if let Ok(len) = client.get_chain_length().await {
-                    data.lock().unwrap()[i] = "·".repeat(len);
-                } else {
-                    data.lock().unwrap()[i] = "?".to_string();
-                }
 
-                use std::{
-                    thread,
-                    time,
-                };
+                data.lock().unwrap()[i] = client.get_chain_length().await.unwrap_or(0);
 
                 let ten_millis = time::Duration::from_millis(250);
 

@@ -45,7 +45,7 @@ pub trait RpcMethods {
     fn make_handshake(&self, req: HandshakeRequest) -> Result<()>;
 
     #[rpc(name = "add_transaction")]
-    fn add_transaction(&self, transaction: Transaction) -> Result<String>;
+    fn add_transaction(&self, transaction: Transaction) -> Result<()>;
 
     #[rpc(name = "add_block")]
     fn add_block(&self, block: Block) -> Result<String>;
@@ -65,8 +65,10 @@ impl RpcMethods for RpcManager {
         Ok(())
     }
 
-    fn add_transaction(&self, transaction: Transaction) -> Result<String> {
-        block_on(add_transaction(&self.state, transaction))
+    fn add_transaction(&self, transaction: Transaction) -> Result<()> {
+        let state = self.state.clone();
+        tokio::spawn(async move { add_transaction(&state, transaction).await });
+        Ok(())
     }
 
     fn add_block(&self, block: Block) -> Result<String> {
@@ -150,7 +152,7 @@ impl Node {
         tokio::spawn(async move {
             for (hostname, port) in peers.values() {
                 let handshake = HandshakeRequest {
-                    ip: "localhost".to_string(),
+                    ip: hostname.to_string(),
                     port: rpc_port,
                     address: wallet.get_public().hash_it(),
                 };

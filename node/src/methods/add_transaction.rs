@@ -26,11 +26,21 @@ use blockchain::{
 };
 use jsonrpc_http_server::jsonrpc_core::*;
 
-pub async fn add_transaction(
-    state: &Arc<Mutex<NodeState>>,
-    transaction: Transaction,
-) -> Result<String> {
-    // Make the transaction signature, hash... is ok and that the funds can be spent
+pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transaction) {
+    // Check the transaction isn't already added into the mempool
+    let txs_is_not_added = state
+        .lock()
+        .unwrap()
+        .mempool
+        .pending_transactions
+        .get(&transaction.get_hash())
+        .is_none();
+
+    if !txs_is_not_added {
+        return;
+    }
+
+    // Make the transaction signature, hash... are ok and that the funds can be spent
     let tx_verification_is_ok = transaction.verify()
         && state
             .lock()
@@ -43,10 +53,24 @@ pub async fn add_transaction(
         let mut state = state.lock().unwrap();
 
         // Add the transaction to the memory pool
-        state.mempool.add_transaction(transaction);
+        state.mempool.add_transaction(&transaction);
+
+        // Propagate the transactions to known peers
+        for (address, (hostname, port)) in &state.peers {
+            let hostname = hostname.clone();
+            let port = *port;
+            let transaction = transaction.clone();
+
+            tokio::spawn(async move {
+                let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                    .await
+                    .unwrap();
+                client.add_transaction(transaction).await.ok();
+            });
+        }
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 100 {
+        if state.mempool.pending_transactions.len() > 50 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -56,8 +80,9 @@ pub async fn add_transaction(
             let elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
 
             if elected_forger == state.wallet.get_public().hash_it() {
-                let block_data =
-                    serde_json::to_string(&state.mempool.pending_transactions).unwrap();
+                let (mut ok_txs, mut bad_txs) = verify_funds_of_txs(&state);
+
+                let block_data = serde_json::to_string(&ok_txs).unwrap();
 
                 let new_block = BlockBuilder::new()
                     .payload(&block_data)
@@ -70,7 +95,8 @@ pub async fn add_transaction(
 
                 state.blockchain.add_block(&new_block).unwrap();
 
-                // Clear mempool
+                ok_txs.append(&mut bad_txs);
+
                 state.mempool.pending_transactions.clear();
 
                 for (hostname, port) in state.peers.values() {
@@ -82,14 +108,37 @@ pub async fn add_transaction(
                         let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
                             .await
                             .unwrap();
-                        client.add_block(new_block).await.unwrap();
+                        client.add_block(new_block).await.ok();
                     });
                 }
             }
         }
 
-        Ok("Verified".to_string())
+        log::info!("(Node.{}) Verified transaction", state.id);
     } else {
-        Ok("Bad verification".to_string())
+        log::error!(
+            "(Node.{}) Verification of transaction failed",
+            state.lock().unwrap().id
+        );
     }
+}
+
+fn verify_funds_of_txs(state: &NodeState) -> (Vec<Transaction>, Vec<Transaction>) {
+    let mut ok_txs = Vec::new();
+    let mut bad_txs = Vec::new();
+
+    let mut temporal_chainstate = state.blockchain.state.clone();
+
+    for (_, tx) in &state.mempool.pending_transactions {
+        // Can be spent ?
+        if temporal_chainstate.verify_transaction_ammount(&tx) {
+            // If so, make it take effect
+            temporal_chainstate.effect_transaction(&tx);
+            ok_txs.push(tx.clone());
+        } else {
+            bad_txs.push(tx.clone());
+        }
+    }
+
+    (ok_txs, bad_txs)
 }

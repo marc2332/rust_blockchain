@@ -66,10 +66,8 @@ impl Blockchain {
      * Append a block to the chain
      */
     pub fn add_block(&mut self, block: &Block) -> Result<(), BlockchainErrors> {
-        self.index += 1;
-
         let mut block = block.clone();
-        block.index = Some(self.index);
+        block.index = Some(self.index + 1);
 
         let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
@@ -106,6 +104,7 @@ impl Blockchain {
             let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
 
             if db_result.is_ok() {
+                self.index += 1;
                 self.chain.push(block.clone());
                 self.last_block_hash = Some(block.hash.clone());
                 log::info!(
