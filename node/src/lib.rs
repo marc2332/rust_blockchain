@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 use std::sync::Arc;
 
 use std::collections::HashMap;
@@ -10,20 +9,25 @@ use blockchain::{
     Wallet,
 };
 
-use futures::executor::block_on;
-use jsonrpc_http_server::{
-    jsonrpc_core::*,
-    *,
+use jsonrpc_core::{
+    serde_json,
+    IoHandler,
+    Result,
 };
-
 use jsonrpc_derive::rpc;
 
 pub mod mempool;
 pub mod methods;
 
+use jsonrpc_http_server::{
+    AccessControlAllowOrigin,
+    DomainsValidation,
+    ServerBuilder,
+};
 use methods::{
     add_block,
     add_transaction,
+    get_block_with_prev_hash,
     get_chain_length,
     make_handshake,
 };
@@ -48,7 +52,10 @@ pub trait RpcMethods {
     fn add_transaction(&self, transaction: Transaction) -> Result<()>;
 
     #[rpc(name = "add_block")]
-    fn add_block(&self, block: Block) -> Result<String>;
+    fn add_block(&self, block: Block) -> Result<()>;
+
+    #[rpc(name = "get_block_with_prev_hash")]
+    fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>>;
 }
 
 struct RpcManager {
@@ -67,12 +74,22 @@ impl RpcMethods for RpcManager {
 
     fn add_transaction(&self, transaction: Transaction) -> Result<()> {
         let state = self.state.clone();
-        tokio::spawn(async move { add_transaction(&state, transaction).await });
+        tokio::spawn(async move {
+            add_transaction(&state, transaction).await;
+        });
         Ok(())
     }
 
-    fn add_block(&self, block: Block) -> Result<String> {
-        add_block(&self.state, block)
+    fn add_block(&self, block: Block) -> Result<()> {
+        let state = self.state.clone();
+        tokio::spawn(async move {
+            add_block(&state, block).await;
+        });
+        Ok(())
+    }
+
+    fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>> {
+        get_block_with_prev_hash(&self.state, prev_hash)
     }
 }
 

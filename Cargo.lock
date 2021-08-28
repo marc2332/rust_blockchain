@@ -816,6 +816,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpc_client",
+ "log 0.4.14",
  "reqwest",
  "rust-crypto",
  "serde",

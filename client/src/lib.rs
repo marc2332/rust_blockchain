@@ -48,7 +48,14 @@ impl RPCClient {
     pub fn add_transaction(&self, transaction: Transaction) -> impl Future<Output = RpcResult<()>> {
         self.0.call_method("add_transaction", "()", (transaction,))
     }
-    pub fn add_block(&self, block: Block) -> impl Future<Output = RpcResult<String>> {
-        self.0.call_method("add_block", "String", (block,))
+    pub fn add_block(&self, block: Block) -> impl Future<Output = RpcResult<()>> {
+        self.0.call_method("add_block", "()", (block,))
+    }
+    pub fn get_block_with_prev_hash(
+        &self,
+        prev_hash: String,
+    ) -> impl Future<Output = RpcResult<Option<Block>>> {
+        self.0
+            .call_method("get_block_with_prev_hash", "Option<Block>", (prev_hash,))
     }
 }

@@ -16,10 +16,7 @@ pub enum TransactionResult {
     BadVerification,
 }
 
-use crate::{
-    tokio,
-    NodeState,
-};
+use crate::NodeState;
 use blockchain::{
     BlockBuilder,
     Transaction,
@@ -55,8 +52,14 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
 
+        let mut propagated_peers = 0;
+
         // Propagate the transactions to known peers
-        for (address, (hostname, port)) in &state.peers {
+        for (_, (hostname, port)) in &state.peers {
+            if propagated_peers == 2 {
+                break;
+            }
+
             let hostname = hostname.clone();
             let port = *port;
             let transaction = transaction.clone();
@@ -67,10 +70,11 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .unwrap();
                 client.add_transaction(transaction).await.ok();
             });
+            propagated_peers += 1;
         }
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 50 {
+        if state.mempool.pending_transactions.len() > 100 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -103,18 +107,26 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     let hostname = hostname.clone();
                     let port = *port;
                     let new_block = new_block.clone();
+                    let id = state.id;
 
                     tokio::spawn(async move {
                         let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
                             .await
                             .unwrap();
-                        client.add_block(new_block).await.ok();
+                        let test = client.add_block(new_block).await;
+
+                        if !test.is_ok() {
+                            log::error!("(Node.{}) Failed propagating block", id);
+                        }
                     });
                 }
             }
         }
-
-        log::info!("(Node.{}) Verified transaction", state.id);
+        log::info!(
+            "(Node.{}) Verified transaction ({})",
+            state.id,
+            state.mempool.pending_transactions.len()
+        );
     } else {
         log::error!(
             "(Node.{}) Verification of transaction failed",

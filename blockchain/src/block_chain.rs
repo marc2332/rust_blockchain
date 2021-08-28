@@ -52,6 +52,8 @@ impl Blockchain {
 
         state.load_from_chain(name);
 
+        assert!(verify_integrity(&chain).is_ok());
+
         Self {
             name: name.to_string(),
             chain,
@@ -71,11 +73,6 @@ impl Blockchain {
 
         let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
-        // Update chainstate with the new transactions
-        for tx in transactions.iter() {
-            self.state.effect_transaction(tx);
-        }
-
         // Make sure that adding the block to the chain won't break it's integrity
         let block_can_be_added = {
             /*
@@ -84,18 +81,19 @@ impl Blockchain {
              */
             if self.last_block_hash.as_ref() == Some(&block.hash) {
                 false
-            } else {
-                let mut temp_chain = self.chain.clone();
-                temp_chain.push(block.clone());
-                let can_be_added = verify_integrity(&temp_chain).is_ok();
-                if !can_be_added {
+            } else if let Some(block_hash) = self.last_block_hash.as_ref() {
+                if block_hash.clone() != block.clone().previous_hash.unwrap() {
                     log::warn!(
                         "(Node.{}) Tried to add a faulty block ({}) to the chain.",
                         self.config.lock().unwrap().id,
                         block.hash.unite()
                     );
+                    false
+                } else {
+                    true
                 }
-                can_be_added
+            } else {
+                true
             }
         };
 
@@ -104,6 +102,11 @@ impl Blockchain {
             let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
 
             if db_result.is_ok() {
+                // Update chainstate with the new transactions
+                for tx in transactions.iter() {
+                    self.state.effect_transaction(tx);
+                }
+
                 self.index += 1;
                 self.chain.push(block.clone());
                 self.last_block_hash = Some(block.hash.clone());
@@ -144,6 +147,17 @@ impl Blockchain {
      */
     pub fn verify_integrity(&self) -> Result<(), BlockchainErrors> {
         verify_integrity(&self.chain)
+    }
+
+    pub fn get_block_with_prev_hash(&self, prev_hash: String) -> Option<Block> {
+        for block in &self.chain {
+            if let Some(block_prev_hash) = &block.previous_hash {
+                if block_prev_hash.unite() == prev_hash {
+                    return Some(block.clone());
+                }
+            }
+        }
+        None
     }
 }
 

@@ -155,7 +155,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 data.lock().unwrap()[i] = client.get_chain_length().await.unwrap_or(0);
 
-                let ten_millis = time::Duration::from_millis(250);
+                let ten_millis = time::Duration::from_millis(1000);
 
                 thread::sleep(ten_millis);
             }
