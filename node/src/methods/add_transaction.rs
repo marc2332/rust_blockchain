@@ -52,11 +52,9 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
 
-        let mut propagated_peers = 0;
-
         // Propagate the transactions to known peers
-        for (_, (hostname, port)) in &state.peers {
-            if propagated_peers == 2 {
+        for (i, (hostname, port)) in state.peers.values().enumerate() {
+            if i == 2 {
                 break;
             }
 
@@ -70,18 +68,17 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .unwrap();
                 client.add_transaction(transaction).await.ok();
             });
-            propagated_peers += 1;
         }
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 100 {
+        if state.mempool.pending_transactions.len() > 500 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
              * If another node tries to propagate a block with a wrong forger it should be punished and ignored
              * WIP
              */
-            let elected_forger = consensus::elect_forger(&state.blockchain).unwrap();
+            let elected_forger = state.next_forger.hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
                 let (mut ok_txs, mut bad_txs) = verify_funds_of_txs(&state);
@@ -113,9 +110,9 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                         let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
                             .await
                             .unwrap();
-                        let test = client.add_block(new_block).await;
+                        let res = client.add_block(new_block).await;
 
-                        if !test.is_ok() {
+                        if res.is_err() {
                             log::error!("(Node.{}) Failed propagating block", id);
                         }
                     });
@@ -141,11 +138,11 @@ fn verify_funds_of_txs(state: &NodeState) -> (Vec<Transaction>, Vec<Transaction>
 
     let mut temporal_chainstate = state.blockchain.state.clone();
 
-    for (_, tx) in &state.mempool.pending_transactions {
+    for tx in state.mempool.pending_transactions.values() {
         // Can be spent ?
-        if temporal_chainstate.verify_transaction_ammount(&tx) {
+        if temporal_chainstate.verify_transaction_ammount(tx) {
             // If so, make it take effect
-            temporal_chainstate.effect_transaction(&tx);
+            temporal_chainstate.effect_transaction(tx);
             ok_txs.push(tx.clone());
         } else {
             bad_txs.push(tx.clone());

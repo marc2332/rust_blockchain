@@ -15,6 +15,7 @@ use crate::{
 pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
     pub addresses: HashMap<String, u64>,
+    pub last_staking_addresses: Vec<Transaction>,
 }
 
 impl Chainstate {
@@ -22,6 +23,7 @@ impl Chainstate {
         Self {
             config,
             addresses: HashMap::new(),
+            last_staking_addresses: Vec::new(),
         }
     }
 
@@ -113,7 +115,13 @@ impl Chainstate {
                     self.addresses.insert(to_address.clone(), *ammount);
                 }
             }
-            _ => {}
+            Transaction::STAKE { .. } => {
+                self.last_staking_addresses.push(tx.clone());
+
+                if self.last_staking_addresses.len() > 100 {
+                    self.last_staking_addresses.pop();
+                }
+            }
         };
     }
 }

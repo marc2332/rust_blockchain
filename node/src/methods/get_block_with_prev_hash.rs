@@ -1,6 +1,5 @@
 use crate::NodeState;
 use blockchain::Block;
-use client::HandshakeRequest;
 use jsonrpc_http_server::jsonrpc_core::*;
 use std::sync::{
     Arc,

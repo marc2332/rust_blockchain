@@ -6,6 +6,7 @@ use blockchain::{
     Block,
     Blockchain,
     Configuration,
+    Key,
     Wallet,
 };
 
@@ -100,6 +101,7 @@ pub struct NodeState {
     pub mempool: Mempool,
     pub wallet: Wallet,
     pub id: u16,
+    pub next_forger: Key,
 }
 
 #[derive(Clone)]
@@ -155,6 +157,8 @@ impl Node {
             peers
         };
 
+        let next_forger = consensus::elect_forger(&blockchain).unwrap();
+
         let state = Arc::new(std::sync::Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),
@@ -162,6 +166,7 @@ impl Node {
             lost_blocks: HashMap::new(),
             wallet: wallet.clone(),
             id: config.id,
+            next_forger,
         }));
 
         assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());

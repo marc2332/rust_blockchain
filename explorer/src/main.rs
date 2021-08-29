@@ -78,27 +78,26 @@ fn nodes_list(f: &mut Frame<CrosstermBackend<Stdout>>, data: Vec<usize>) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
             ]
             .as_ref(),
         )
         .split(f.size());
 
-    for i in 0..10 {
+    for i in 0..5 {
         let paragraph = Paragraph::new("█".repeat(data[i]))
             .style(Style::default().fg(Color::White))
             .block(
                 Block::default()
-                    .title(format!("node {} ({})", i, data[i].to_string()))
+                    .title(format!(
+                        "node {} (Block height: {})",
+                        i,
+                        data[i].to_string()
+                    ))
                     .borders(Borders::ALL),
             )
             .alignment(Alignment::Left)
@@ -144,8 +143,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     terminal.clear()?;
-    let data = Arc::new(Mutex::new(vec![0; 10]));
-    for i in 0..10 {
+    let data = Arc::new(Mutex::new(vec![0; 5]));
+    for i in 0..5 {
         let data = data.clone();
         tokio::spawn(async move {
             loop {

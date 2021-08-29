@@ -9,7 +9,6 @@ use blockchain::{
 };
 use chrono::Utc;
 use client::RPCClient;
-use futures::future::join_all;
 use jsonrpc_core::serde_json;
 use log::LevelFilter;
 use node::Node;
@@ -21,7 +20,7 @@ use std::{
 };
 
 fn create_nodes() -> Vec<(Node, Configuration)> {
-    (0..10)
+    (0..5)
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
@@ -67,7 +66,6 @@ async fn main() {
         .sign_with(&genesis_wallet)
         .build_coinbase();
 
-    /*
     let mut staking_transactions = nodes
         .iter()
         .flat_map(|(_, config)| {
@@ -91,14 +89,6 @@ async fn main() {
             ]
         })
         .collect::<Vec<Transaction>>();
-        */
-    let mut staking_transactions = vec![TransactionBuilder::new()
-        .key(&genesis_wallet.get_public())
-        .from_address(&genesis_wallet.get_public().hash_it())
-        .ammount(2)
-        .hash_stake()
-        .sign_with(&genesis_wallet)
-        .build_stake()];
 
     let mut transactions = vec![genesis_transaction];
     transactions.append(&mut staking_transactions);
@@ -126,9 +116,12 @@ async fn main() {
              * All other 14 nodes should also stake a small ammount to be able to participate in forgint the next block
              */
         }
-        nodes_runtimes.push(tokio::spawn(async move {
-            let mut node = node.clone();
-            node.run(config).await;
+        nodes_runtimes.push(thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let mut node = node.clone();
+                node.run(config).await;
+            })
         }));
     }
 
@@ -140,7 +133,7 @@ async fn main() {
 
         let wallet_b = Wallet::default();
 
-        for i in 0..10000 {
+        for i in 0..1000000 {
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
                 .key(&genesis_wallet.get_public())
@@ -153,10 +146,10 @@ async fn main() {
 
             client.add_transaction(sample_tx).await.ok();
 
-            let delay = time::Duration::from_millis(100);
+            let delay = time::Duration::from_millis(25);
             thread::sleep(delay);
         }
-    });
-
-    join_all(nodes_runtimes).await;
+    })
+    .await
+    .unwrap();
 }

@@ -11,3 +11,4 @@
 - [ ] Prevent double spending by making a temporal chainstate to ensure the integrity of the funds
 - [ ] Variable fees
 - [ ] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
+- [ ] Scalable block size relative to the network performance

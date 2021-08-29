@@ -1,5 +1,6 @@
 use blockchain::{
     Blockchain,
+    Key,
     Transaction,
 };
 use crypto::{
@@ -18,32 +19,12 @@ pub enum ConsensusErrors {
 /*
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
-pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> {
-    let mut stakings = Vec::<Transaction>::new();
-    for (i, block) in blockchain.iter().enumerate() {
-        if i + 100 >= blockchain.chain.len() {
-            let txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
-
-            for tx in txs {
-                if let Transaction::STAKE { .. } = tx {
-                    let tx_verification_is_ok = tx.verify();
-
-                    if tx_verification_is_ok {
-                        if stakings.len() < 100 {
-                            stakings.push(tx);
-                        }
-                    } else {
-                        println!("Blockchain is broken.");
-                        return Err(ConsensusErrors::TransactionBroken);
-                    }
-                }
-            }
-        }
-    }
+pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
+    let stakings = &blockchain.state.last_staking_addresses;
 
     let txs_hash = {
         let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        for tx in &stakings {
+        for tx in stakings {
             if let Transaction::STAKE { signature, .. } = tx {
                 hasher.input_str(signature.hash_it().as_str());
             }
@@ -55,13 +36,15 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
     let mut forger = None;
 
     while len > 0 {
-        for tx in &stakings {
+        for tx in stakings {
             if let Transaction::STAKE {
-                from_address, hash, ..
+                author_public_key,
+                hash,
+                ..
             } = tx
             {
                 if hash.contains(&txs_hash[0..len]) {
-                    forger = Some(from_address);
+                    forger = Some(author_public_key);
                     break;
                 }
             }
@@ -72,5 +55,5 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<String, ConsensusErrors> 
         }
     }
 
-    Ok(forger.unwrap().to_string())
+    Ok(forger.unwrap().clone())
 }
