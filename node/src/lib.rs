@@ -28,8 +28,10 @@ use jsonrpc_http_server::{
 use methods::{
     add_block,
     add_transaction,
+    get_address_ammount,
     get_block_with_prev_hash,
     get_chain_length,
+    get_node_address,
     make_handshake,
 };
 
@@ -57,6 +59,12 @@ pub trait RpcMethods {
 
     #[rpc(name = "get_block_with_prev_hash")]
     fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>>;
+
+    #[rpc(name = "get_node_address")]
+    fn get_node_address(&self) -> Result<String>;
+
+    #[rpc(name = "get_address_ammount")]
+    fn get_address_ammount(&self, address: String) -> Result<u64>;
 }
 
 struct RpcManager {
@@ -91,6 +99,14 @@ impl RpcMethods for RpcManager {
 
     fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>> {
         get_block_with_prev_hash(&self.state, prev_hash)
+    }
+
+    fn get_node_address(&self) -> Result<String> {
+        Ok(get_node_address(&self.state))
+    }
+
+    fn get_address_ammount(&self, address: String) -> Result<u64> {
+        Ok(get_address_ammount(&self.state, address))
     }
 }
 

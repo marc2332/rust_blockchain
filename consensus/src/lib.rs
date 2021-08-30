@@ -3,13 +3,6 @@ use blockchain::{
     Key,
     Transaction,
 };
-use crypto::{
-    digest::Digest,
-    sha3::{
-        Sha3,
-        Sha3Mode,
-    },
-};
 
 #[derive(Debug)]
 pub enum ConsensusErrors {
@@ -22,17 +15,19 @@ pub enum ConsensusErrors {
 pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
     let stakings = &blockchain.state.last_staking_addresses;
 
-    let txs_hash = {
-        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        for tx in stakings {
-            if let Transaction::STAKE { signature, .. } = tx {
-                hasher.input_str(signature.hash_it().as_str());
-            }
+    let last_block = blockchain.chain.last().unwrap();
+    let previous_forger = {
+        if let Some(previous_hash) = last_block.previous_hash.as_ref() {
+            let previous_block = blockchain
+                .get_block_with_hash(previous_hash.unite())
+                .unwrap();
+            Some(previous_block.key.hash_it())
+        } else {
+            None
         }
-        hasher.result_str()
     };
 
-    let mut len = txs_hash.len();
+    let mut len = last_block.hash.hash.len();
     let mut forger = None;
 
     while len > 0 {
@@ -40,16 +35,24 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
             if let Transaction::STAKE {
                 author_public_key,
                 hash,
+                from_address,
                 ..
             } = tx
             {
-                if hash.contains(&txs_hash[0..len]) {
+                if let Some(ref previous_forger) = previous_forger {
+                    if from_address != previous_forger
+                        && hash.contains(&last_block.hash.hash[0..len])
+                    {
+                        forger = Some(author_public_key);
+                        break;
+                    }
+                } else if hash.contains(&last_block.hash.hash[0..len]) {
                     forger = Some(author_public_key);
                     break;
                 }
             }
-            len -= 1;
         }
+        len -= 1;
         if forger.is_some() {
             break;
         }

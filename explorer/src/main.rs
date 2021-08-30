@@ -18,10 +18,7 @@ use crossterm::{
 };
 use std::{
     error::Error,
-    io::{
-        stdout,
-        Stdout,
-    },
+    io::stdout,
     sync::{
         mpsc,
         Arc,
@@ -43,15 +40,20 @@ use tui::{
     },
     style::{
         Color,
+        Modifier,
         Style,
+    },
+    text::{
+        Span,
+        Spans,
     },
     widgets::{
         Block,
         Borders,
         Paragraph,
+        Tabs,
         Wrap,
     },
-    Frame,
     Terminal,
 };
 
@@ -73,36 +75,26 @@ struct Cli {
     enhanced_graphics: bool,
 }
 
-fn nodes_list(f: &mut Frame<CrosstermBackend<Stdout>>, data: Vec<usize>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-            ]
-            .as_ref(),
-        )
-        .split(f.size());
+struct TabsState {
+    current: usize,
+    titles: Vec<String>,
+}
 
-    for i in 0..5 {
-        let paragraph = Paragraph::new("█".repeat(data[i]))
-            .style(Style::default().fg(Color::White))
-            .block(
-                Block::default()
-                    .title(format!(
-                        "node {} (Block height: {})",
-                        i,
-                        data[i].to_string()
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true });
-        f.render_widget(paragraph, chunks[i]);
+impl TabsState {
+    pub fn new(titles: Vec<String>) -> Self {
+        Self { current: 0, titles }
+    }
+
+    pub fn next(&mut self) {
+        if self.current < self.titles.len() - 1 {
+            self.current += 1;
+        }
+    }
+
+    pub fn prev(&mut self) {
+        if self.current > 0 {
+            self.current -= 1;
+        }
     }
 }
 
@@ -117,71 +109,224 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let backend = CrosstermBackend::new(stdout);
 
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.clear().unwrap();
+
+    let tabs_state = Arc::new(Mutex::new(TabsState::new(vec![
+        "Blockchains".to_string(),
+        "Addresses".to_string(),
+    ])));
 
     // Setup input handling
     let (tx, rx) = mpsc::channel();
 
     let tick_rate = Duration::from_millis(cli.tick_rate);
-    thread::spawn(move || {
+    let tabs = tabs_state.clone();
+
+    tokio::spawn(async move {
         let mut last_tick = Instant::now();
         loop {
-            // poll for tick rate duration, if no events, sent tick event.
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
-            if event::poll(timeout).unwrap() {
-                if let CEvent::Key(key) = event::read().unwrap() {
-                    tx.send(Event::Input(key)).unwrap();
+
+            if let Ok(res) = event::poll(timeout) {
+                if res {
+                    if let CEvent::Key(key) = event::read().unwrap() {
+                        tx.send(Event::Input(key)).unwrap();
+                    }
                 }
-            }
-            if last_tick.elapsed() >= tick_rate {
-                tx.send(Event::Tick).unwrap();
-                last_tick = Instant::now();
+                if last_tick.elapsed() >= tick_rate {
+                    tx.send(Event::Tick).unwrap();
+                    last_tick = Instant::now();
+                }
             }
         }
     });
 
-    terminal.clear()?;
-    let data = Arc::new(Mutex::new(vec![0; 5]));
+    let mut start_time = Instant::now();
+    let times = Arc::new(Mutex::new(vec![1; 5]));
+    let blockchain_data = Arc::new(Mutex::new(vec![0; 5]));
+    let addresses_data = Arc::new(Mutex::new(vec![("-".to_string(), 0); 5]));
+
     for i in 0..5 {
-        let data = data.clone();
+        let blockchain_data = blockchain_data.clone();
+        let addresses_data = addresses_data.clone();
+        let times = times.clone();
+
         tokio::spawn(async move {
             loop {
                 let client = RPCClient::new(&format!("http://localhost:{}", 2000 + i))
                     .await
                     .unwrap();
 
-                data.lock().unwrap()[i] = client.get_chain_length().await.unwrap_or(0);
+                let blockchain_res = client.get_chain_length().await.unwrap_or(0);
+
+                if blockchain_data.lock().unwrap()[i] != blockchain_res {
+                    blockchain_data.lock().unwrap()[i] = blockchain_res;
+                    let duration = start_time.elapsed();
+                    times.lock().unwrap()[i] = duration.as_secs();
+                    start_time = Instant::now();
+                }
+
+                let node_address = client
+                    .get_node_address()
+                    .await
+                    .unwrap_or_else(|_| "?".to_string());
+
+                let address_data = client
+                    .get_address_ammount(node_address.clone())
+                    .await
+                    .unwrap_or(0);
+
+                if addresses_data.lock().unwrap()[i].1 != address_data {
+                    addresses_data.lock().unwrap()[i] = (node_address, address_data);
+                }
 
                 let ten_millis = time::Duration::from_millis(1000);
-
                 thread::sleep(ten_millis);
             }
         });
     }
 
     loop {
-        terminal.draw(|f| {
-            nodes_list(f, data.lock().unwrap().to_vec());
+        let blockchain_data = blockchain_data.clone();
+        let addresses_data = addresses_data.clone();
+        let times = times.clone();
+        let tabs_state = tabs_state.clone();
+
+        terminal.draw(move |f| {
+            let blockchain_data = blockchain_data.lock().unwrap().to_vec();
+            let addresses_data = addresses_data.lock().unwrap().to_vec();
+            let times = times.lock().unwrap();
+            let tabs_state = tabs_state.lock().unwrap();
+
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(
+                    [
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(15),
+                        Constraint::Percentage(15),
+                        Constraint::Percentage(15),
+                        Constraint::Percentage(15),
+                        Constraint::Percentage(15),
+                        Constraint::Percentage(5),
+                    ]
+                    .as_ref(),
+                )
+                .split(f.size());
+
+            let titles = tabs_state
+                .titles
+                .iter()
+                .map(|title| Spans::from(vec![Span::raw(title)]))
+                .collect::<Vec<Spans>>();
+            let tabs = Tabs::new(titles)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Menu")
+                        .title_alignment(Alignment::Center),
+                )
+                .select(tabs_state.current)
+                .style(Style::default().fg(Color::Cyan))
+                .highlight_style(
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .bg(Color::Black),
+                );
+            f.render_widget(tabs, chunks[0]);
+
+            match tabs_state.current {
+                0 => {
+                    for i in 0..5 {
+                        let paragraph = Paragraph::new("█".repeat(blockchain_data[i]))
+                            .style(Style::default().fg(Color::White))
+                            .block(
+                                Block::default()
+                                    .title(format!(
+                                        "node {} (Block height: {})",
+                                        i,
+                                        blockchain_data[i].to_string()
+                                    ))
+                                    .borders(Borders::ALL),
+                            )
+                            .alignment(Alignment::Left)
+                            .wrap(Wrap { trim: true });
+                        f.render_widget(paragraph, chunks[i + 1]);
+                    }
+
+                    // Average time of block creation
+                    let block_creation_avg = {
+                        let mut avg = 0;
+                        for block_time in times.iter() {
+                            avg += block_time;
+                        }
+                        avg / 5
+                    };
+
+                    // 500 txs is the block size
+                    let tps = {
+                        if block_creation_avg == 0 {
+                            0
+                        } else {
+                            500 / block_creation_avg
+                        }
+                    };
+
+                    let paragraph = Paragraph::new(format!(
+                        "Block time = {}s | TPS = {}",
+                        block_creation_avg, tps
+                    ))
+                    .style(Style::default().fg(Color::White))
+                    .alignment(Alignment::Center)
+                    .wrap(Wrap { trim: true });
+                    f.render_widget(paragraph, chunks[6]);
+                }
+                1 => {
+                    for i in 0..5 {
+                        let paragraph =
+                            Paragraph::new(format!("Ammount -> {}", addresses_data[i].1))
+                                .style(Style::default().fg(Color::White))
+                                .block(
+                                    Block::default()
+                                        .title(format!(
+                                            "node {} (Address: {})",
+                                            i, addresses_data[i].0
+                                        ))
+                                        .borders(Borders::ALL),
+                                )
+                                .alignment(Alignment::Left)
+                                .wrap(Wrap { trim: true });
+                        f.render_widget(paragraph, chunks[i + 1]);
+                    }
+                }
+                _ => {}
+            }
         })?;
-        match rx.recv()? {
-            Event::Input(event) => match event.code {
+
+        if let Event::Input(event) = rx.recv().unwrap() {
+            match event.code {
                 KeyCode::Char('q') => {
-                    disable_raw_mode()?;
+                    disable_raw_mode().unwrap();
                     execute!(
                         terminal.backend_mut(),
                         LeaveAlternateScreen,
                         DisableMouseCapture
-                    )?;
-                    terminal.show_cursor()?;
-                    break;
+                    )
+                    .unwrap();
+                    terminal.show_cursor().unwrap();
+                    std::process::exit(0);
+                }
+                KeyCode::Right => {
+                    tabs.lock().unwrap().next();
+                }
+                KeyCode::Left => {
+                    tabs.lock().unwrap().prev();
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
     }
-
-    Ok(())
 }

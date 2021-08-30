@@ -133,7 +133,7 @@ async fn main() {
 
         let wallet_b = Wallet::default();
 
-        for i in 0..1000000 {
+        for i in 0..100000 {
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
                 .key(&genesis_wallet.get_public())
@@ -146,7 +146,7 @@ async fn main() {
 
             client.add_transaction(sample_tx).await.ok();
 
-            let delay = time::Duration::from_millis(25);
+            let delay = time::Duration::from_millis(30);
             thread::sleep(delay);
         }
     })

@@ -20,6 +20,7 @@ use crate::NodeState;
 use blockchain::{
     BlockBuilder,
     Transaction,
+    TransactionBuilder,
 };
 use jsonrpc_http_server::jsonrpc_core::*;
 
@@ -71,7 +72,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         }
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 500 {
+        if state.mempool.pending_transactions.len() > 499 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -82,6 +83,15 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
             if elected_forger == state.wallet.get_public().hash_it() {
                 let (mut ok_txs, mut bad_txs) = verify_funds_of_txs(&state);
+
+                let reward_tx = TransactionBuilder::new()
+                    .to_address(&state.wallet.get_public().hash_it())
+                    .ammount(1)
+                    .hash_coinbase()
+                    .sign_with(&state.wallet)
+                    .build_coinbase();
+
+                ok_txs.push(reward_tx);
 
                 let block_data = serde_json::to_string(&ok_txs).unwrap();
 
@@ -96,9 +106,14 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
                 state.blockchain.add_block(&new_block).unwrap();
 
+                // Elect the next forger
+                state.next_forger = consensus::elect_forger(&state.blockchain).unwrap();
+
                 ok_txs.append(&mut bad_txs);
 
-                state.mempool.pending_transactions.clear();
+                for tx in ok_txs {
+                    state.mempool.pending_transactions.remove(&tx.get_hash());
+                }
 
                 for (hostname, port) in state.peers.values() {
                     let hostname = hostname.clone();

@@ -12,13 +12,12 @@ use blockchain::{
 use client::RPCClient;
 use jsonrpc_http_server::jsonrpc_core::*;
 
-pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
+pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
     /*
-     * This should also make sure the forger is the right one
+     * This should also make sure Fthe forger is the right one
      */
     let is_block_ok = || {
-        let elected_forger =
-            consensus::elect_forger(&node_state.lock().unwrap().blockchain).unwrap();
+        let elected_forger = consensus::elect_forger(&state.lock().unwrap().blockchain).unwrap();
 
         // Make sure elected forger is the right one
         if !block.verify_sign_with(&PublicAddress::from(&elected_forger)) {
@@ -30,7 +29,7 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
         // Make sure the transactions movements are correct
         for transaction in transactions.iter() {
             let tx_verification_is_ok = transaction.verify()
-                && node_state
+                && state
                     .lock()
                     .unwrap()
                     .blockchain
@@ -44,25 +43,27 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
         true
     };
 
-    let state = node_state.clone();
     if is_block_ok() {
-        if node_state
+        if state
             .lock()
             .unwrap()
             .blockchain
             .add_block(&block.clone())
             .is_ok()
         {
-            tokio::spawn(async move {
-                let next_forger =
-                    consensus::elect_forger(&state.lock().unwrap().blockchain).unwrap();
-                state.lock().unwrap().next_forger = next_forger;
-            });
+            println!(
+                "{:?} | {:?}",
+                state.lock().unwrap().blockchain.chain.last().unwrap().hash,
+                block.hash
+            );
+
+            let next_forger = consensus::elect_forger(&state.lock().unwrap().blockchain).unwrap();
+            state.lock().unwrap().next_forger = next_forger;
 
             let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
             for tx in block_txs {
-                node_state
+                state
                     .lock()
                     .unwrap()
                     .mempool
@@ -70,12 +71,12 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
                     .remove(&tx.get_hash());
             }
         } else {
-            let node_state = node_state.clone();
+            let state = state.clone();
 
             // Incredibly awful, should be improved
 
-            let peers = node_state.lock().unwrap().peers.clone();
-            let prev_hash = node_state
+            let peers = state.lock().unwrap().peers.clone();
+            let prev_hash = state
                 .lock()
                 .unwrap()
                 .blockchain
@@ -95,7 +96,7 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
                 let res = client.get_block_with_prev_hash(prev_hash.clone()).await;
 
                 if let Ok(Some(block)) = res {
-                    node_state
+                    state
                         .lock()
                         .unwrap()
                         .lost_blocks
@@ -104,7 +105,7 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
                 }
             }
 
-            let mut state = node_state.lock().unwrap();
+            let mut state = state.lock().unwrap();
             state.lost_blocks.insert(block.hash.unite(), block);
 
             let mut blocks_iter = state.lost_blocks.clone().into_iter().peekable();
@@ -116,6 +117,17 @@ pub async fn add_block(node_state: &Arc<Mutex<NodeState>>, block: Block) {
                 if res {
                     blocks.remove(&block.hash.unite());
                     blocks_iter = blocks.clone().into_iter().peekable();
+
+                    // Elect next block forger
+                    let next_forger = consensus::elect_forger(&state.blockchain).unwrap();
+                    state.next_forger = next_forger;
+
+                    // Remove confirmed transactions from the mempool
+                    let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+
+                    for tx in block_txs {
+                        state.mempool.pending_transactions.remove(&tx.get_hash());
+                    }
                 }
             }
 

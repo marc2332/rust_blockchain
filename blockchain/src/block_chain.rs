@@ -159,6 +159,15 @@ impl Blockchain {
         }
         None
     }
+
+    pub fn get_block_with_hash(&self, hash: String) -> Option<Block> {
+        for block in &self.chain {
+            if block.hash.unite() == hash {
+                return Some(block.clone());
+            }
+        }
+        None
+    }
 }
 
 fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {

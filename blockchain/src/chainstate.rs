@@ -27,6 +27,10 @@ impl Chainstate {
         }
     }
 
+    pub fn get_address_ammount(&self, address: String) -> u64 {
+        *self.addresses.get(&address).unwrap_or(&0)
+    }
+
     /*
      * Calculate the chainstate from the begining of the blockchain
      */
