@@ -11,8 +11,19 @@ WIP.
 | discovery_server | A signaling server for nodes to find each other                                             |
 | cli              | CLI Runner of a Node                                                                        |
 
-Run simulation (WIP):
+## Requirements
+- Cargo (nightly toolchain)
+- Openssl
+
+## Run simulation (WIP)
+In one terminal run:
 ```shell
 cd node
 cargo run --example simulation
+```
+
+And in another:
+```shell
+cd discovery_server
+cargo run
 ```
