@@ -7,7 +7,7 @@ WIP.
 | blockchain       | Different utilities to build a blockchain, blocks, hashing, public-private keys, signing... |
 | node             | Node client that runs a JSON-RPC server and has a blockchain (WIP)                          |
 | client           | JSON-RPC Client to connect and interact with a node                                         |
-| consensus        | Dummy POW utilities (not really used)                                                       |
+| consensus        | Consensus utilities                                                                         |
 | discovery_server | A signaling server for nodes to find each other                                             |
 | cli              | CLI Runner of a Node                                                                        |
 

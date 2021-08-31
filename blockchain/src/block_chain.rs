@@ -29,6 +29,9 @@ pub enum BlockchainErrors {
     InvalidHash,
     CouldntLoadBlock(String),
     CouldntAddBlock(String),
+    MultipleCoinbase(String),
+    InvalidCoinbaseAddress(String),
+    InvalidBlockForger(String),
 }
 
 impl Blockchain {
@@ -172,27 +175,54 @@ impl Blockchain {
 
 fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {
     for (i, block) in chain.iter().enumerate() {
+        let block_hash = &block.hash;
+        let block_author = block.key.hash_it();
+        let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+
+        for (tx_i, tx) in block_txs.iter().enumerate() {
+            if let Transaction::COINBASE { hash, .. } = tx {
+                // There can only be one coinbase in each block
+                if tx_i > 0 {
+                    return Err(BlockchainErrors::MultipleCoinbase(hash.to_string()));
+                }
+            }
+
+            if tx_i == 0 {
+                // The first transaction must always be a coinbase rewarding the block creator
+                if let Transaction::COINBASE {
+                    to_address, hash, ..
+                } = tx
+                {
+                    if to_address != &block_author {
+                        return Err(BlockchainErrors::InvalidCoinbaseAddress(hash.clone()));
+                    }
+                } else {
+                    return Err(BlockchainErrors::MultipleCoinbase(block_hash.unite()));
+                }
+            }
+        }
+
         if i > 0 {
             let previous_block = &chain[i - 1];
-
-            /*
-             * The previous hash must be the same as the previous block's hash
-             */
             let previous_hash = block.previous_hash.as_ref().unwrap();
 
+            // The previous hash must be the same as the previous block's hash
             if previous_hash.unite() != previous_block.hash.unite() {
                 return Err(BlockchainErrors::InvalidPrevioushHash(
                     previous_hash.hash.clone(),
                     previous_block.hash.hash.clone(),
                 ));
             }
+
+            //It should also check if the block forger isn't the same as the previous one
+            if previous_block.key == block.key {
+                return Err(BlockchainErrors::InvalidBlockForger(block.hash.unite()));
+            }
         }
 
         let block_signer = PublicAddress::from(&block.key);
 
-        /*
-         * The signature must be correct according the public key and the block data
-         */
+        // The signature must be correct according the public key and the block data
         if !block.verify_sign_with(&block_signer) {
             return Err(BlockchainErrors::InvalidSignature);
         }

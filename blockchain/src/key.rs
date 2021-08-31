@@ -12,7 +12,7 @@ use serde::{
     Serialize,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Key(pub Vec<u8>);
 
 #[allow(dead_code)]

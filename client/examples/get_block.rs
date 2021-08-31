@@ -1,7 +1,3 @@
-use blockchain::{
-    TransactionBuilder,
-    Wallet,
-};
 use client::RPCClient;
 
 #[tokio::main]

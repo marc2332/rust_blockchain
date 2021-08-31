@@ -30,6 +30,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
+                4,
             );
 
             let node = Node::new();
@@ -145,9 +146,6 @@ async fn main() {
                 .build_movement();
 
             client.add_transaction(sample_tx).await.ok();
-
-            let delay = time::Duration::from_millis(30);
-            thread::sleep(delay);
         }
     })
     .await

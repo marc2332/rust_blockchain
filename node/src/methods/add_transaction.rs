@@ -84,9 +84,10 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             if elected_forger == state.wallet.get_public().hash_it() {
                 let (mut ok_txs, mut bad_txs) = verify_funds_of_txs(&state);
 
+                // Coinbase transaction sent to the block forger as a reward
                 let reward_tx = TransactionBuilder::new()
                     .to_address(&state.wallet.get_public().hash_it())
-                    .ammount(1)
+                    .ammount(10)
                     .hash_coinbase()
                     .sign_with(&state.wallet)
                     .build_coinbase();

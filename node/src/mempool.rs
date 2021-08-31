@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::Transaction;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Mempool {
     pub pending_transactions: HashMap<String, Transaction>,
 }

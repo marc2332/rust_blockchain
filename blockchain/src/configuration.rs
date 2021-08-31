@@ -11,6 +11,7 @@ pub struct Configuration {
     pub rpc_port: u16,
     pub hostname: String,
     pub wallet: Wallet,
+    pub transaction_threads: u16,
 }
 
 impl Configuration {
@@ -22,6 +23,7 @@ impl Configuration {
             rpc_port: 2000,
             hostname: "0.0.0.0".to_string(),
             wallet: Wallet::default(),
+            transaction_threads: 5,
         }
     }
 
@@ -31,6 +33,7 @@ impl Configuration {
         rpc_port: u16,
         hostname: &str,
         wallet: Wallet,
+        transaction_threads: u16,
     ) -> Self {
         let db = sled::open(db_name).unwrap();
         Self {
@@ -39,6 +42,7 @@ impl Configuration {
             rpc_port,
             hostname: hostname.to_string(),
             wallet,
+            transaction_threads,
         }
     }
 

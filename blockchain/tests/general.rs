@@ -24,28 +24,32 @@ fn test() {
     let public_key = account_a.get_public();
 
     if blockchain.last_block_hash.is_none() {
-        blockchain.add_block(
-            &BlockBuilder::new()
-                .payload("block 1")
-                .timestamp(Utc::now())
-                .key(&public_key)
-                .hash_it()
-                .sign_with(&account_a)
-                .build(),
-        );
+        blockchain
+            .add_block(
+                &BlockBuilder::new()
+                    .payload("block 1")
+                    .timestamp(Utc::now())
+                    .key(&public_key)
+                    .hash_it()
+                    .sign_with(&account_a)
+                    .build(),
+            )
+            .unwrap();
     }
 
     for i in 1..5 {
-        blockchain.add_block(
-            &BlockBuilder::new()
-                .payload(&format!("Block {:?}", i))
-                .timestamp(Utc::now())
-                .previous_hash(&blockchain.last_block_hash.clone().unwrap())
-                .key(&public_key)
-                .hash_it()
-                .sign_with(&account_a)
-                .build(),
-        );
+        blockchain
+            .add_block(
+                &BlockBuilder::new()
+                    .payload(&format!("Block {:?}", i))
+                    .timestamp(Utc::now())
+                    .previous_hash(&blockchain.last_block_hash.clone().unwrap())
+                    .key(&public_key)
+                    .hash_it()
+                    .sign_with(&account_a)
+                    .build(),
+            )
+            .unwrap();
     }
 
     let block_3 = BlockBuilder::new()

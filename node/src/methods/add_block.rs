@@ -51,17 +51,13 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             .add_block(&block.clone())
             .is_ok()
         {
-            println!(
-                "{:?} | {:?}",
-                state.lock().unwrap().blockchain.chain.last().unwrap().hash,
-                block.hash
-            );
-
+            // Elect the next forger
             let next_forger = consensus::elect_forger(&state.lock().unwrap().blockchain).unwrap();
             state.lock().unwrap().next_forger = next_forger;
 
             let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
+            // Remove thee bundled transactions from the mempool
             for tx in block_txs {
                 state
                     .lock()
