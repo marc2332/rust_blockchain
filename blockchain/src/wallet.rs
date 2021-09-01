@@ -19,6 +19,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Wallet {
     pub keypair: PKey<Private>,
+    pub history: u64,
 }
 
 impl SignVerifier for Wallet {
@@ -34,7 +35,10 @@ impl Wallet {
         let keypair = Rsa::generate(1024).unwrap();
         let keypair = PKey::from_rsa(keypair).unwrap();
 
-        Self { keypair }
+        Self {
+            keypair,
+            history: 0,
+        }
     }
 
     pub fn sign_data(&self, data: String) -> Key {
@@ -57,10 +61,10 @@ impl Wallet {
         Key(public_key)
     }
 
-    pub fn from_private(private_key: &[u8]) -> Self {
+    pub fn from_private(private_key: &[u8], history: u64) -> Self {
         let keypair = PKey::private_key_from_pem(private_key).unwrap();
 
-        Self { keypair }
+        Self { keypair, history }
     }
 }
 

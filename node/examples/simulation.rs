@@ -5,6 +5,7 @@ use blockchain::{
     Configuration,
     Transaction,
     TransactionBuilder,
+    TransactionType,
     Wallet,
 };
 use chrono::Utc;
@@ -24,7 +25,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
-            let config = Configuration::from_params(
+            let mut config = Configuration::from_params(
                 i,
                 &format!("db_{}", i),
                 2000 + i,
@@ -54,39 +55,35 @@ async fn main() {
         .init()
         .unwrap();
 
-    let nodes = create_nodes();
+    let mut nodes = create_nodes();
 
     let mut nodes_runtimes = Vec::new();
 
-    let genesis_wallet = nodes[0].1.wallet.clone();
+    let mut genesis_wallet = Wallet::default();
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&genesis_wallet.get_public().hash_it())
         .ammount(20000000000)
-        .hash_coinbase()
-        .sign_with(&genesis_wallet)
-        .build_coinbase();
+        .is_type(TransactionType::COINBASE)
+        .with_wallet(&mut genesis_wallet)
+        .build();
 
+    // Make a coinbase and a stake transaction fore very node
     let mut staking_transactions = nodes
-        .iter()
+        .iter_mut()
         .flat_map(|(_, config)| {
-            let wallet = config.wallet.clone();
             vec![
                 TransactionBuilder::new()
-                    .key(&genesis_wallet.get_public())
-                    .from_address(&genesis_wallet.get_public().hash_it())
-                    .to_address(&wallet.get_public().hash_it())
+                    .to_address(&config.wallet.get_public().hash_it())
                     .ammount(10)
-                    .hash_movement()
-                    .sign_with(&wallet)
-                    .build_movement(),
+                    .is_type(TransactionType::MOVEMENT)
+                    .with_wallet(&mut genesis_wallet)
+                    .build(),
                 TransactionBuilder::new()
-                    .key(&wallet.get_public())
-                    .from_address(&wallet.get_public().hash_it())
                     .ammount(2)
-                    .hash_stake()
-                    .sign_with(&wallet)
-                    .build_stake(),
+                    .is_type(TransactionType::STAKE)
+                    .with_wallet(&mut config.wallet)
+                    .build(),
             ]
         })
         .collect::<Vec<Transaction>>();
@@ -106,7 +103,7 @@ async fn main() {
 
     println!("{:?}", genesis_wallet.get_private().0);
 
-    for (node, config) in nodes.clone() {
+    for (node, config) in nodes {
         let mut blockchain =
             Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
 
@@ -121,7 +118,7 @@ async fn main() {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 let mut node = node.clone();
-                node.run(config).await;
+                node.run(config.clone()).await;
             })
         }));
     }
@@ -137,13 +134,11 @@ async fn main() {
         for i in 0..100000 {
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
-                .key(&genesis_wallet.get_public())
-                .from_address(&genesis_wallet.get_public().hash_it())
                 .to_address(&wallet_b.get_public().hash_it())
                 .ammount(i)
-                .hash_movement()
-                .sign_with(&genesis_wallet)
-                .build_movement();
+                .is_type(TransactionType::MOVEMENT)
+                .with_wallet(&mut genesis_wallet)
+                .build();
 
             client.add_transaction(sample_tx).await.ok();
         }

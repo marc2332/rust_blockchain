@@ -11,10 +11,17 @@ use crate::{
     Transaction,
 };
 
+#[derive(Default, Clone)]
+pub struct AddressInfo {
+    pub ammount: u64,
+    // aka nonce
+    pub history: u64,
+}
+
 #[derive(Clone)]
 pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
-    pub addresses: HashMap<String, u64>,
+    pub addresses: HashMap<String, AddressInfo>,
     pub last_staking_addresses: Vec<Transaction>,
 }
 
@@ -28,7 +35,13 @@ impl Chainstate {
     }
 
     pub fn get_address_ammount(&self, address: String) -> u64 {
-        *self.addresses.get(&address).unwrap_or(&0)
+        self.addresses
+            .get(&address)
+            .unwrap_or(&AddressInfo {
+                ammount: 0,
+                history: 0,
+            })
+            .ammount
     }
 
     /*
@@ -55,8 +68,8 @@ impl Chainstate {
                 ammount,
                 ..
             } => {
-                if let Some(address_amm) = &mut self.addresses.get(&from_address.clone()) {
-                    *address_amm >= ammount
+                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                    address_info.ammount >= *ammount
                 } else {
                     false
                 }
@@ -66,13 +79,55 @@ impl Chainstate {
                 ammount,
                 ..
             } => {
-                if let Some(address_amm) = &mut self.addresses.get(&from_address.clone()) {
-                    *address_amm >= ammount
+                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                    address_info.ammount >= *ammount
                 } else {
                     false
                 }
             }
             Transaction::COINBASE { .. } => true,
+        }
+    }
+
+    /*
+     * Verify the `history` of the transaction is accurate to the chainstate
+     * This prevents transaction duplication
+     */
+    pub fn verify_transaction_history(&self, tx: &Transaction) -> bool {
+        match tx {
+            Transaction::MOVEMENT {
+                from_address,
+                history,
+                ..
+            } => {
+                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                    address_info.history == *history
+                } else {
+                    false
+                }
+            }
+            Transaction::STAKE {
+                from_address,
+                history,
+                ..
+            } => {
+                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                    address_info.history == *history
+                } else {
+                    false
+                }
+            }
+            Transaction::COINBASE {
+                to_address,
+                history,
+                ..
+            } => {
+                if let Some(address_info) = &mut self.addresses.get(&to_address.clone()) {
+                    address_info.history == *history
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -85,45 +140,79 @@ impl Chainstate {
                 from_address,
                 to_address,
                 ammount,
+                history,
                 ..
             } => {
-                if let Some(address_amm) = self.addresses.get(&from_address.clone()) {
-                    // Address is loaded
-                    if address_amm >= ammount {
-                        // Has enough ammount, OK
-
-                        #[allow(mutable_borrow_reservation_conflict)]
-                        self.addresses
-                            .insert(from_address.clone(), address_amm - ammount);
-
-                        if let Some(address_amm) = self.addresses.get(&to_address.clone()) {
-                            #[allow(mutable_borrow_reservation_conflict)]
-                            self.addresses
-                                .insert(to_address.clone(), *address_amm + ammount);
+                let origin_is_valid = {
+                    // Address does exist
+                    if let Some(address_info) = self.addresses.get_mut(&from_address.clone()) {
+                        // Has enough ammount and the history is correct
+                        if &address_info.ammount >= ammount && &address_info.history == history {
+                            // Remove the transaction ammount from the origin
+                            address_info.ammount -= ammount;
+                            address_info.history += 1;
+                            true
                         } else {
-                            self.addresses.insert(to_address.clone(), *ammount);
+                            false
                         }
+                    } else {
+                        false
+                    }
+                };
+
+                if origin_is_valid {
+                    if let Some(address_info) = self.addresses.get_mut(&to_address.clone()) {
+                        address_info.ammount += ammount;
+                    } else {
+                        self.addresses.insert(
+                            to_address.clone(),
+                            AddressInfo {
+                                ammount: *ammount,
+                                history: 0,
+                            },
+                        );
                     }
                 }
             }
             Transaction::COINBASE {
                 to_address,
                 ammount,
+                history,
                 ..
             } => {
-                if let Some(address_amm) = self.addresses.get(&to_address.clone()) {
-                    #[allow(mutable_borrow_reservation_conflict)]
-                    self.addresses
-                        .insert(to_address.clone(), *address_amm + ammount);
+                if let Some(address_info) = self.addresses.get_mut(&to_address.clone()) {
+                    // The history is correct
+                    if &address_info.history == history {
+                        address_info.ammount += ammount;
+                    }
                 } else {
-                    self.addresses.insert(to_address.clone(), *ammount);
+                    self.addresses.insert(
+                        to_address.clone(),
+                        AddressInfo {
+                            ammount: *ammount,
+                            history: 1,
+                        },
+                    );
                 }
             }
-            Transaction::STAKE { .. } => {
-                self.last_staking_addresses.push(tx.clone());
+            Transaction::STAKE {
+                ammount,
+                from_address,
+                history,
+                ..
+            } => {
+                if let Some(address_info) = self.addresses.get_mut(&from_address.clone()) {
+                    // Has enough ammount and the history is correct
+                    if &address_info.ammount >= ammount && &address_info.history == history {
+                        address_info.ammount -= ammount;
+                        address_info.history += 1;
 
-                if self.last_staking_addresses.len() > 100 {
-                    self.last_staking_addresses.pop();
+                        self.last_staking_addresses.push(tx.clone());
+
+                        if self.last_staking_addresses.len() > 100 {
+                            self.last_staking_addresses.pop();
+                        }
+                    }
                 }
             }
         };

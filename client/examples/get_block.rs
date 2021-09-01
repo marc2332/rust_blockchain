@@ -7,13 +7,9 @@ async fn main() {
 
     let mut args = std::env::args();
 
-    args.next();
-
-    let hash = args.next().unwrap();
-
-    println!("{}", hash);
+    let hash = args.nth(1).unwrap();
 
     let block = client.get_block_with_prev_hash(hash).await.unwrap();
 
-    println!("{:?}", block);
+    println!("{} -> {:?}", hash, block);
 }

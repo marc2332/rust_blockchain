@@ -22,7 +22,10 @@ pub use configuration::Configuration;
 pub use key::Key;
 pub use public_address::PublicAddress;
 pub use transaction::Transaction;
-pub use transaction_builder::TransactionBuilder;
+pub use transaction_builder::{
+    TransactionBuilder,
+    TransactionType,
+};
 pub use wallet::Wallet;
 
 pub trait SignVerifier {

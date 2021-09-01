@@ -63,8 +63,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                     .lock()
                     .unwrap()
                     .mempool
-                    .pending_transactions
-                    .remove(&tx.get_hash());
+                    .remove_transaction(&tx.get_hash())
             }
         } else {
             let state = state.clone();
@@ -122,7 +121,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                     let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
                     for tx in block_txs {
-                        state.mempool.pending_transactions.remove(&tx.get_hash());
+                        state.mempool.remove_transaction(&tx.get_hash());
                     }
                 }
             }

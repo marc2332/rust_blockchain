@@ -12,13 +12,20 @@ use crate::{
     Wallet,
 };
 
+pub enum TransactionType {
+    MOVEMENT,
+    STAKE,
+    COINBASE,
+}
+
 pub struct TransactionBuilder {
     pub author_public_key: Option<Key>,
     pub from_address: Option<String>,
     pub to_address: Option<String>,
     pub ammount: Option<u64>,
-    pub hash: Option<String>,
-    pub signature: Option<Key>,
+    pub history: Option<u64>,
+    pub type_tx: Option<TransactionType>,
+    pub wallet: Option<Wallet>,
 }
 
 impl Default for TransactionBuilder {
@@ -34,14 +41,10 @@ impl TransactionBuilder {
             from_address: None,
             to_address: None,
             ammount: None,
-            hash: None,
-            signature: None,
+            history: None,
+            type_tx: None,
+            wallet: None,
         }
-    }
-
-    pub fn from_address(&mut self, from_address: &str) -> &mut Self {
-        self.from_address = Some(from_address.to_string());
-        self
     }
 
     pub fn to_address(&mut self, to_address: &str) -> &mut Self {
@@ -54,69 +57,83 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn key(&mut self, key: &Key) -> &mut Self {
-        self.author_public_key = Some(key.clone());
+    pub fn is_type(&mut self, type_tx: TransactionType) -> &mut Self {
+        self.type_tx = Some(type_tx);
         self
     }
 
-    pub fn hash_movement(&mut self) -> &mut Self {
-        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
-        hasher.input_str(self.from_address.as_ref().unwrap());
-        hasher.input_str(self.to_address.as_ref().unwrap());
-        hasher.input_str(&self.ammount.unwrap().to_string());
-        self.hash = Some(hasher.result_str());
+    pub fn with_wallet(&mut self, wallet: &mut Wallet) -> &mut Self {
+        self.wallet = Some(wallet.clone());
+        self.history = Some(wallet.history);
+        self.author_public_key = Some(wallet.get_public());
+        self.from_address = Some(wallet.get_public().hash_it());
+        wallet.history += 1;
         self
     }
 
-    pub fn hash_stake(&mut self) -> &mut Self {
-        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
-        hasher.input_str(self.from_address.as_ref().unwrap());
-        hasher.input_str(&self.ammount.unwrap().to_string());
-        self.hash = Some(hasher.result_str());
-        self
-    }
+    pub fn build(&self) -> Transaction {
+        let wallet = self.wallet.as_ref().unwrap();
+        let type_tx = self.type_tx.as_ref().unwrap();
 
-    pub fn hash_coinbase(&mut self) -> &mut Self {
-        let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-        hasher.input_str(self.to_address.as_ref().unwrap());
-        hasher.input_str(&self.ammount.unwrap().to_string());
-        self.hash = Some(hasher.result_str());
-        self
-    }
+        match type_tx {
+            TransactionType::COINBASE => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
-    pub fn sign_with(&mut self, acc: &Wallet) -> &mut Self {
-        self.signature = Some(acc.sign_data(self.hash.as_ref().unwrap().to_string()));
-        self
-    }
+                hasher.input_str(self.to_address.as_ref().unwrap());
+                hasher.input_str(&self.ammount.unwrap().to_string());
+                hasher.input_str(&self.history.unwrap().to_string());
 
-    pub fn build_movement(&self) -> Transaction {
-        Transaction::MOVEMENT {
-            author_public_key: self.author_public_key.as_ref().unwrap().clone(),
-            signature: self.signature.as_ref().unwrap().clone(),
-            from_address: self.from_address.as_ref().unwrap().clone(),
-            to_address: self.to_address.as_ref().unwrap().clone(),
-            ammount: *self.ammount.as_ref().unwrap(),
-            hash: self.hash.as_ref().unwrap().clone(),
-        }
-    }
+                let hash = hasher.result_str();
 
-    pub fn build_stake(&self) -> Transaction {
-        Transaction::STAKE {
-            author_public_key: self.author_public_key.as_ref().unwrap().clone(),
-            signature: self.signature.as_ref().unwrap().clone(),
-            from_address: self.from_address.as_ref().unwrap().clone(),
-            ammount: *self.ammount.as_ref().unwrap(),
-            hash: self.hash.as_ref().unwrap().clone(),
-        }
-    }
+                Transaction::COINBASE {
+                    to_address: self.to_address.as_ref().unwrap().clone(),
+                    ammount: *self.ammount.as_ref().unwrap(),
+                    hash,
+                    history: self.history.unwrap(),
+                }
+            }
+            TransactionType::MOVEMENT => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
-    pub fn build_coinbase(&self) -> Transaction {
-        Transaction::COINBASE {
-            to_address: self.to_address.as_ref().unwrap().clone(),
-            ammount: *self.ammount.as_ref().unwrap(),
-            hash: self.hash.as_ref().unwrap().clone(),
+                hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
+                hasher.input_str(self.from_address.as_ref().unwrap());
+                hasher.input_str(self.to_address.as_ref().unwrap());
+                hasher.input_str(&self.ammount.unwrap().to_string());
+                hasher.input_str(&self.history.unwrap().to_string());
+
+                let hash = hasher.result_str();
+                let signature = wallet.sign_data(hash.clone());
+
+                Transaction::MOVEMENT {
+                    author_public_key: self.author_public_key.as_ref().unwrap().clone(),
+                    signature,
+                    from_address: self.from_address.as_ref().unwrap().clone(),
+                    to_address: self.to_address.as_ref().unwrap().clone(),
+                    ammount: *self.ammount.as_ref().unwrap(),
+                    hash,
+                    history: self.history.unwrap(),
+                }
+            }
+            TransactionType::STAKE => {
+                let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+
+                hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
+                hasher.input_str(self.from_address.as_ref().unwrap());
+                hasher.input_str(&self.ammount.unwrap().to_string());
+                hasher.input_str(&self.history.unwrap().to_string());
+
+                let hash = hasher.result_str();
+                let signature = wallet.sign_data(hash.clone());
+
+                Transaction::STAKE {
+                    author_public_key: self.author_public_key.as_ref().unwrap().clone(),
+                    signature,
+                    from_address: self.from_address.as_ref().unwrap().clone(),
+                    ammount: *self.ammount.as_ref().unwrap(),
+                    hash,
+                    history: self.history.unwrap(),
+                }
+            }
         }
     }
 }

@@ -113,10 +113,12 @@ impl Blockchain {
                 self.index += 1;
                 self.chain.push(block.clone());
                 self.last_block_hash = Some(block.hash.clone());
+
                 log::info!(
-                    "(Node.{}) Added block -> {:?}",
+                    "(Node.{}) Added block -> {:?} (size of {})",
                     self.config.lock().unwrap().id,
-                    block.hash.unite()
+                    block.hash.unite(),
+                    transactions.len()
                 );
                 Ok(())
             } else {

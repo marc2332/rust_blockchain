@@ -21,6 +21,7 @@ use blockchain::{
     BlockBuilder,
     Transaction,
     TransactionBuilder,
+    TransactionType,
 };
 use jsonrpc_http_server::jsonrpc_core::*;
 
@@ -82,15 +83,15 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             let elected_forger = state.next_forger.hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
-                let (mut ok_txs, mut bad_txs) = verify_funds_of_txs(&state);
+                let (mut ok_txs, mut bad_txs) = verify_veracity_of_transactions(&state);
 
                 // Coinbase transaction sent to the block forger as a reward
                 let reward_tx = TransactionBuilder::new()
                     .to_address(&state.wallet.get_public().hash_it())
                     .ammount(10)
-                    .hash_coinbase()
-                    .sign_with(&state.wallet)
-                    .build_coinbase();
+                    .is_type(TransactionType::COINBASE)
+                    .with_wallet(&mut state.wallet)
+                    .build();
 
                 ok_txs.push(reward_tx);
 
@@ -113,7 +114,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                 ok_txs.append(&mut bad_txs);
 
                 for tx in ok_txs {
-                    state.mempool.pending_transactions.remove(&tx.get_hash());
+                    state.mempool.remove_transaction(&tx.get_hash());
                 }
 
                 for (hostname, port) in state.peers.values() {
@@ -148,16 +149,28 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
     }
 }
 
-fn verify_funds_of_txs(state: &NodeState) -> (Vec<Transaction>, Vec<Transaction>) {
+fn verify_veracity_of_transactions(state: &NodeState) -> (Vec<Transaction>, Vec<Transaction>) {
     let mut ok_txs = Vec::new();
     let mut bad_txs = Vec::new();
 
+    let mut mempool = state.mempool.clone();
+    let pending_transactions = mempool.pending_transactions.clone();
+
+    mempool.pending_transactions_list.sort_by(|hash_a, hash_b| {
+        let tx_a = pending_transactions.get(hash_a).unwrap();
+        let tx_b = pending_transactions.get(hash_b).unwrap();
+
+        tx_a.get_history().cmp(&tx_b.get_history())
+    });
+
     let mut temporal_chainstate = state.blockchain.state.clone();
 
-    for tx in state.mempool.pending_transactions.values() {
-        // Can be spent ?
-        if temporal_chainstate.verify_transaction_ammount(tx) {
-            // If so, make it take effect
+    for tx_hash in mempool.pending_transactions_list {
+        let tx = mempool.pending_transactions.get(&tx_hash).unwrap();
+        // Make sure the funds are enough and the history is accurate
+        if temporal_chainstate.verify_transaction_ammount(tx)
+            && temporal_chainstate.verify_transaction_history(tx)
+        {
             temporal_chainstate.effect_transaction(tx);
             ok_txs.push(tx.clone());
         } else {

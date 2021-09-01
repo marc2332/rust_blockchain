@@ -25,11 +25,13 @@ pub enum Transaction {
         to_address: String,
         ammount: u64,
         hash: String,
+        history: u64,
     },
     COINBASE {
         to_address: String,
         ammount: u64,
         hash: String,
+        history: u64,
     },
     STAKE {
         author_public_key: Key,
@@ -37,6 +39,7 @@ pub enum Transaction {
         from_address: String,
         ammount: u64,
         hash: String,
+        history: u64,
     },
 }
 
@@ -50,6 +53,14 @@ impl Transaction {
         .to_string()
     }
 
+    pub fn get_history(&self) -> u64 {
+        *match self {
+            Transaction::MOVEMENT { history, .. } => history,
+            Transaction::COINBASE { history, .. } => history,
+            Transaction::STAKE { history, .. } => history,
+        }
+    }
+
     pub fn hash_it(&self) -> String {
         match self {
             Transaction::MOVEMENT {
@@ -57,6 +68,7 @@ impl Transaction {
                 from_address,
                 to_address,
                 ammount,
+                history,
                 ..
             } => {
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
@@ -64,28 +76,33 @@ impl Transaction {
                 hasher.input_str(from_address);
                 hasher.input_str(to_address);
                 hasher.input_str(&ammount.to_string());
+                hasher.input_str(&history.to_string());
                 hasher.result_str()
             }
             Transaction::COINBASE {
                 to_address,
                 ammount,
+                history,
                 ..
             } => {
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
                 hasher.input_str(to_address);
                 hasher.input_str(&ammount.to_string());
+                hasher.input_str(&history.to_string());
                 hasher.result_str()
             }
             Transaction::STAKE {
                 author_public_key,
                 from_address,
                 ammount,
+                history,
                 ..
             } => {
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
                 hasher.input_str(&author_public_key.to_string());
                 hasher.input_str(from_address);
                 hasher.input_str(&ammount.to_string());
+                hasher.input_str(&history.to_string());
                 hasher.result_str()
             }
         }
