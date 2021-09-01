@@ -9,7 +9,7 @@ async fn main() {
 
     let hash = args.nth(1).unwrap();
 
-    let block = client.get_block_with_prev_hash(hash).await.unwrap();
+    let block = client.get_block_with_prev_hash(hash.clone()).await.unwrap();
 
     println!("{} -> {:?}", hash, block);
 }
