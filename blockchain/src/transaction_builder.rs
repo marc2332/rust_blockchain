@@ -67,12 +67,16 @@ impl TransactionBuilder {
         self.history = Some(wallet.history);
         self.author_public_key = Some(wallet.get_public());
         self.from_address = Some(wallet.get_public().hash_it());
-        wallet.history += 1;
+        match self.type_tx.as_ref().unwrap() {
+            TransactionType::COINBASE { .. } => {}
+            _ => {
+                wallet.history += 1;
+            }
+        };
         self
     }
 
     pub fn build(&self) -> Transaction {
-        let wallet = self.wallet.as_ref().unwrap();
         let type_tx = self.type_tx.as_ref().unwrap();
 
         match type_tx {
@@ -81,7 +85,6 @@ impl TransactionBuilder {
 
                 hasher.input_str(self.to_address.as_ref().unwrap());
                 hasher.input_str(&self.ammount.unwrap().to_string());
-                hasher.input_str(&self.history.unwrap().to_string());
 
                 let hash = hasher.result_str();
 
@@ -89,10 +92,10 @@ impl TransactionBuilder {
                     to_address: self.to_address.as_ref().unwrap().clone(),
                     ammount: *self.ammount.as_ref().unwrap(),
                     hash,
-                    history: self.history.unwrap(),
                 }
             }
             TransactionType::MOVEMENT => {
+                let wallet = self.wallet.as_ref().unwrap();
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
                 hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
@@ -115,6 +118,7 @@ impl TransactionBuilder {
                 }
             }
             TransactionType::STAKE => {
+                let wallet = self.wallet.as_ref().unwrap();
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
                 hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());

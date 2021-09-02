@@ -73,7 +73,8 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         }
 
         // Minimum transactions per block are harcoded for now
-        if state.mempool.pending_transactions.len() > 499 {
+        let mempool_len = state.mempool.pending_transactions.len();
+        if mempool_len > 499 && mempool_len % 50 == 0 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -153,25 +154,23 @@ fn verify_veracity_of_transactions(state: &NodeState) -> (Vec<Transaction>, Vec<
     let mut ok_txs = Vec::new();
     let mut bad_txs = Vec::new();
 
-    let mut mempool = state.mempool.clone();
-    let pending_transactions = mempool.pending_transactions.clone();
+    let pending_transactions = state.mempool.pending_transactions.clone();
 
-    mempool.pending_transactions_list.sort_by(|hash_a, hash_b| {
-        let tx_a = pending_transactions.get(hash_a).unwrap();
-        let tx_b = pending_transactions.get(hash_b).unwrap();
+    let mut pending_transactions = pending_transactions
+        .values()
+        .cloned()
+        .collect::<Vec<Transaction>>();
 
-        tx_a.get_history().cmp(&tx_b.get_history())
-    });
+    pending_transactions.sort_by_key(|tx| tx.get_history());
 
     let mut temporal_chainstate = state.blockchain.state.clone();
 
-    for tx_hash in mempool.pending_transactions_list {
-        let tx = mempool.pending_transactions.get(&tx_hash).unwrap();
+    for tx in pending_transactions {
         // Make sure the funds are enough and the history is accurate
-        if temporal_chainstate.verify_transaction_ammount(tx)
-            && temporal_chainstate.verify_transaction_history(tx)
+        if temporal_chainstate.verify_transaction_ammount(&tx)
+            && temporal_chainstate.verify_transaction_history(&tx)
         {
-            temporal_chainstate.effect_transaction(tx);
+            temporal_chainstate.effect_transaction(&tx);
             ok_txs.push(tx.clone());
         } else {
             bad_txs.push(tx.clone());

@@ -92,12 +92,12 @@ impl RpcMethods for RpcManager {
 
     fn add_transaction(&self, transaction: Transaction) -> Result<()> {
         let mut state = self.state.lock().unwrap();
-        state.transaction_threads[state.available_channel]
+        state.transaction_threads[state.available_tx_thread]
             .send(ThreadMsg::AddTransaction(transaction))
             .unwrap();
-        state.available_channel += 1;
-        if state.available_channel == state.transaction_threads.len() {
-            state.available_channel = 0;
+        state.available_tx_thread += 1;
+        if state.available_tx_thread == state.transaction_threads.len() {
+            state.available_tx_thread = 0;
         }
         Ok(())
     }
@@ -133,7 +133,7 @@ pub struct NodeState {
     pub id: u16,
     pub next_forger: Key,
     pub transaction_threads: Vec<Sender<ThreadMsg>>,
-    pub available_channel: usize,
+    pub available_tx_thread: usize,
 }
 
 pub enum ThreadMsg {
@@ -208,9 +208,9 @@ impl Node {
             lost_blocks: HashMap::new(),
             wallet: wallet.clone(),
             id: config.id,
-            next_forger,
+            next_forger: next_forger.clone(),
             transaction_threads: Vec::new(),
-            available_channel: 0,
+            available_tx_thread: 0,
         }));
 
         // Setup the transactions handlers threads

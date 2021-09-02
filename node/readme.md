@@ -1,6 +1,5 @@
 ### TO-DO
-- [ ] Ignore already used staking transactions
-- [ ] Reward the block forgers
+- [x] Reward the block forgers
 - [x] Propagate transactions
 - [x] Remove transactions from the mempool that has been bundled on a propagated block
 - [ ] Prioritize sending transactions to the next block forger
@@ -8,5 +7,5 @@
 - [x] Use `enum` instead of `struct` to easily have different types of Transactions inside the blocks 
 - [ ] Make the discovery server a library and make a different crate to launch it as cli, this way the discovery server could be launched right from the simulation example
 - [ ] Variable fees
-- [ ] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
+- [x] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
 - [ ] Scalable block size relative to the network performance

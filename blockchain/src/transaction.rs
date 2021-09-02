@@ -31,7 +31,6 @@ pub enum Transaction {
         to_address: String,
         ammount: u64,
         hash: String,
-        history: u64,
     },
     STAKE {
         author_public_key: Key,
@@ -56,7 +55,7 @@ impl Transaction {
     pub fn get_history(&self) -> u64 {
         *match self {
             Transaction::MOVEMENT { history, .. } => history,
-            Transaction::COINBASE { history, .. } => history,
+            Transaction::COINBASE { .. } => &0_u64,
             Transaction::STAKE { history, .. } => history,
         }
     }
@@ -82,13 +81,11 @@ impl Transaction {
             Transaction::COINBASE {
                 to_address,
                 ammount,
-                history,
                 ..
             } => {
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
                 hasher.input_str(to_address);
                 hasher.input_str(&ammount.to_string());
-                hasher.input_str(&history.to_string());
                 hasher.result_str()
             }
             Transaction::STAKE {

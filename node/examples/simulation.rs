@@ -25,7 +25,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
-            let mut config = Configuration::from_params(
+            let config = Configuration::from_params(
                 i,
                 &format!("db_{}", i),
                 2000 + i,

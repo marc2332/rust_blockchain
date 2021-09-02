@@ -117,17 +117,7 @@ impl Chainstate {
                     false
                 }
             }
-            Transaction::COINBASE {
-                to_address,
-                history,
-                ..
-            } => {
-                if let Some(address_info) = &mut self.addresses.get(&to_address.clone()) {
-                    address_info.history == *history
-                } else {
-                    false
-                }
-            }
+            Transaction::COINBASE { .. } => true,
         }
     }
 
@@ -177,20 +167,16 @@ impl Chainstate {
             Transaction::COINBASE {
                 to_address,
                 ammount,
-                history,
                 ..
             } => {
                 if let Some(address_info) = self.addresses.get_mut(&to_address.clone()) {
-                    // The history is correct
-                    if &address_info.history == history {
-                        address_info.ammount += ammount;
-                    }
+                    address_info.ammount += ammount;
                 } else {
                     self.addresses.insert(
                         to_address.clone(),
                         AddressInfo {
                             ammount: *ammount,
-                            history: 1,
+                            history: 0,
                         },
                     );
                 }
