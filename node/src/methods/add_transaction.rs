@@ -16,7 +16,10 @@ pub enum TransactionResult {
     BadVerification,
 }
 
-use crate::NodeState;
+use crate::{
+    mempool::Mempool,
+    NodeState,
+};
 use blockchain::{
     BlockBuilder,
     Transaction,
@@ -84,7 +87,18 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             let elected_forger = state.next_forger.hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
-                let (mut ok_txs, mut bad_txs) = verify_veracity_of_transactions(&state);
+                let mut pending_transactions = state
+                    .mempool
+                    .pending_transactions
+                    .values()
+                    .cloned()
+                    .collect::<Vec<Transaction>>();
+                pending_transactions.sort_by_key(|tx| tx.get_history());
+                let mut chainstate = state.blockchain.state.clone();
+                let (mut ok_txs, mut bad_txs) = Mempool::verify_veracity_of_transactions(
+                    &mut pending_transactions,
+                    &mut chainstate,
+                );
 
                 // Coinbase transaction sent to the block forger as a reward
                 let reward_tx = TransactionBuilder::new()
@@ -148,34 +162,4 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             state.lock().unwrap().id
         );
     }
-}
-
-fn verify_veracity_of_transactions(state: &NodeState) -> (Vec<Transaction>, Vec<Transaction>) {
-    let mut ok_txs = Vec::new();
-    let mut bad_txs = Vec::new();
-
-    let pending_transactions = state.mempool.pending_transactions.clone();
-
-    let mut pending_transactions = pending_transactions
-        .values()
-        .cloned()
-        .collect::<Vec<Transaction>>();
-
-    pending_transactions.sort_by_key(|tx| tx.get_history());
-
-    let mut temporal_chainstate = state.blockchain.state.clone();
-
-    for tx in pending_transactions {
-        // Make sure the funds are enough and the history is accurate
-        if temporal_chainstate.verify_transaction_ammount(&tx)
-            && temporal_chainstate.verify_transaction_history(&tx)
-        {
-            temporal_chainstate.effect_transaction(&tx);
-            ok_txs.push(tx.clone());
-        } else {
-            bad_txs.push(tx.clone());
-        }
-    }
-
-    (ok_txs, bad_txs)
 }

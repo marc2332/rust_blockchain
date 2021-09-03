@@ -1,4 +1,5 @@
 #![feature(slice_pattern)]
+#![feature(async_closure)]
 use blockchain::{
     BlockBuilder,
     Blockchain,
@@ -10,6 +11,7 @@ use blockchain::{
 };
 use chrono::Utc;
 use client::RPCClient;
+use futures::Future;
 use jsonrpc_core::serde_json;
 use log::LevelFilter;
 use node::Node;
@@ -31,7 +33,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                4,
+                6,
             );
 
             let node = Node::new();
@@ -63,7 +65,7 @@ async fn main() {
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&genesis_wallet.get_public().hash_it())
-        .ammount(20000000000)
+        .ammount(200000000000)
         .is_type(TransactionType::COINBASE)
         .with_wallet(&mut genesis_wallet)
         .build();
@@ -90,6 +92,16 @@ async fn main() {
 
     let mut transactions = vec![genesis_transaction];
     transactions.append(&mut staking_transactions);
+
+    let mut senders_threads = Vec::new();
+
+    let senders = 5;
+
+    for i in 0..senders {
+        let (tx, sender) = create_sender(&mut genesis_wallet, i);
+        transactions.push(tx);
+        senders_threads.push(sender);
+    }
 
     let block_data = serde_json::to_string(&transactions).unwrap();
 
@@ -123,26 +135,47 @@ async fn main() {
         }));
     }
 
-    tokio::spawn(async move {
+    std::thread::spawn(move || {
+        discovery_server::main().unwrap();
+    });
+
+    futures::future::join_all(senders_threads).await;
+}
+
+fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Future<Output = ()>) {
+    let mut sender_wallet = Wallet::default();
+
+    let transaction = TransactionBuilder::new()
+        .to_address(&sender_wallet.get_public().hash_it())
+        .ammount(2000000)
+        .is_type(TransactionType::MOVEMENT)
+        .with_wallet(genesis_wallet)
+        .build();
+
+    let sender = std::thread::spawn(async move || {
         let delay = time::Duration::from_millis(2000);
         thread::sleep(delay);
 
-        let client = RPCClient::new("http://localhost:2000").await.unwrap();
+        let client = RPCClient::new(&format!("http://localhost:{}", 2000 + i))
+            .await
+            .unwrap();
 
-        let wallet_b = Wallet::default();
+        let temp_wallet = Wallet::default();
 
-        for i in 0..100000 {
+        for _ in 0..100000 {
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
-                .to_address(&wallet_b.get_public().hash_it())
-                .ammount(i)
+                .to_address(&temp_wallet.get_public().hash_it())
+                .ammount(100)
                 .is_type(TransactionType::MOVEMENT)
-                .with_wallet(&mut genesis_wallet)
+                .with_wallet(&mut sender_wallet)
                 .build();
 
             client.add_transaction(sample_tx).await.ok();
         }
     })
-    .await
+    .join()
     .unwrap();
+
+    (transaction, sender)
 }

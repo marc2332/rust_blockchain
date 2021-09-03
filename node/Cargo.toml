@@ -24,3 +24,4 @@ tokio = { version = "1.9.0", features = ["full"]}
 [dev-dependencies]
 actix-rt = "2.2.0"
 simple_logger = "1.13.0"
+discovery_server = { path = "../discovery_server" }

@@ -21,9 +21,3 @@ In one terminal run:
 cd node
 cargo run --example simulation
 ```
-
-And in another:
-```shell
-cd discovery_server
-cargo run
-```

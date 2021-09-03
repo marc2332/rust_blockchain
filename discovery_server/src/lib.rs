@@ -59,7 +59,7 @@ struct State {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+pub async fn main() -> std::io::Result<()> {
     let state = Arc::new(Mutex::new(State::default()));
 
     HttpServer::new(move || {

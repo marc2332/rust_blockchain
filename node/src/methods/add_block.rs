@@ -3,7 +3,10 @@ use std::sync::{
     Mutex,
 };
 
-use crate::NodeState;
+use crate::{
+    mempool::Mempool,
+    NodeState,
+};
 use blockchain::{
     Block,
     PublicAddress,
@@ -13,37 +16,24 @@ use client::RPCClient;
 use jsonrpc_http_server::jsonrpc_core::*;
 
 pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
-    /*
-     * This should also make sure Fthe forger is the right one
-     */
-    let is_block_ok = || {
+    let is_block_ok = {
         let elected_forger = state.lock().unwrap().next_forger.clone();
 
         // Make sure elected forger is the right one
-        if !block.verify_sign_with(&PublicAddress::from(&elected_forger)) {
-            return false;
+        if block.verify_sign_with(&PublicAddress::from(&elected_forger)) {
+            let mut transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+
+            let mut chainstate = state.lock().unwrap().blockchain.state.clone();
+            let (_, bad_txs) =
+                Mempool::verify_veracity_of_transactions(&mut transactions, &mut chainstate);
+
+            bad_txs.is_empty()
+        } else {
+            false
         }
-
-        let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
-
-        // Make sure the transactions movements are correct
-        for transaction in transactions.iter() {
-            let tx_verification_is_ok = transaction.verify()
-                && state
-                    .lock()
-                    .unwrap()
-                    .blockchain
-                    .state
-                    .verify_transaction_ammount(transaction);
-
-            if !tx_verification_is_ok {
-                return false;
-            }
-        }
-        true
     };
 
-    if is_block_ok() {
+    if is_block_ok {
         if state
             .lock()
             .unwrap()

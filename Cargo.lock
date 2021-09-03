@@ -2224,6 +2224,7 @@ dependencies = [
  "chrono",
  "client",
  "consensus",
+ "discovery_server",
  "futures 0.3.16",
  "jsonrpc-core",
  "jsonrpc-core-client",
