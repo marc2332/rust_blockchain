@@ -49,17 +49,12 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
             // Remove thee bundled transactions from the mempool
+            let mut state = state.lock().unwrap();
             for tx in block_txs {
-                state
-                    .lock()
-                    .unwrap()
-                    .mempool
-                    .remove_transaction(&tx.get_hash())
+                state.mempool.remove_transaction(&tx.get_hash())
             }
         } else {
             let state = state.clone();
-
-            // Incredibly awful, should be improved
 
             let peers = state.lock().unwrap().peers.clone();
             let prev_hash = state
@@ -94,6 +89,8 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             let mut state = state.lock().unwrap();
             state.lost_blocks.insert(block.hash.unite(), block);
 
+            // Incredibly awful, should be improved
+
             let mut blocks_iter = state.lost_blocks.clone().into_iter().peekable();
             let mut blocks = state.lost_blocks.clone();
 
@@ -125,5 +122,10 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 state.lost_blocks.len()
             );
         }
+    } else {
+        log::warn!(
+            "(Node.{}) Tried to add a broken block.",
+            state.lock().unwrap().id
+        );
     }
 }

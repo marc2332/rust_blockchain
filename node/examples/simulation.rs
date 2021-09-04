@@ -33,7 +33,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                6,
+                10,
             );
 
             let node = Node::new();
@@ -95,7 +95,7 @@ async fn main() {
 
     let mut senders_threads = Vec::new();
 
-    let senders = 5;
+    let senders = 4;
 
     for i in 0..senders {
         let (tx, sender) = create_sender(&mut genesis_wallet, i);
@@ -122,9 +122,6 @@ async fn main() {
         // Create a genesis block if there isn't
         if blockchain.last_block_hash.is_none() {
             blockchain.add_block(&genesis_block).unwrap();
-            /*
-             * All other 14 nodes should also stake a small ammount to be able to participate in forgint the next block
-             */
         }
         nodes_runtimes.push(thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -138,6 +135,9 @@ async fn main() {
     std::thread::spawn(move || {
         discovery_server::main().unwrap();
     });
+
+    let delay = time::Duration::from_millis(2000);
+    thread::sleep(delay);
 
     futures::future::join_all(senders_threads).await;
 }
@@ -153,9 +153,6 @@ fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Futu
         .build();
 
     let sender = std::thread::spawn(async move || {
-        let delay = time::Duration::from_millis(2000);
-        thread::sleep(delay);
-
         let client = RPCClient::new(&format!("http://localhost:{}", 2000 + i))
             .await
             .unwrap();

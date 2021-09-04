@@ -92,12 +92,12 @@ impl RpcMethods for RpcManager {
 
     fn add_transaction(&self, transaction: Transaction) -> Result<()> {
         let mut state = self.state.lock().unwrap();
-        state.transaction_threads[state.available_tx_thread]
+        state.transaction_handlers[state.available_tx_handler]
             .send(ThreadMsg::AddTransaction(transaction))
             .unwrap();
-        state.available_tx_thread += 1;
-        if state.available_tx_thread == state.transaction_threads.len() {
-            state.available_tx_thread = 0;
+        state.available_tx_handler += 1;
+        if state.available_tx_handler == state.transaction_handlers.len() {
+            state.available_tx_handler = 0;
         }
         Ok(())
     }
@@ -132,12 +132,26 @@ pub struct NodeState {
     pub wallet: Wallet,
     pub id: u16,
     pub next_forger: Key,
-    pub transaction_threads: Vec<Sender<ThreadMsg>>,
-    pub available_tx_thread: usize,
+    pub transaction_handlers: Vec<Sender<ThreadMsg>>,
+    pub available_tx_handler: usize,
+    pub transaction_senders: Vec<Sender<ThreadMsg>>,
+    pub available_tx_sender: usize,
+    pub block_senders: Vec<Sender<ThreadMsg>>,
+    pub available_block_sender: usize,
 }
 
 pub enum ThreadMsg {
     AddTransaction(Transaction),
+    PropagateTransaction {
+        transaction: Transaction,
+        hostname: String,
+        port: u16,
+    },
+    PropagateBlock {
+        block: Block,
+        hostname: String,
+        port: u16,
+    },
 }
 
 #[derive(Clone)]
@@ -209,16 +223,34 @@ impl Node {
             wallet: wallet.clone(),
             id: config.id,
             next_forger: next_forger.clone(),
-            transaction_threads: Vec::new(),
-            available_tx_thread: 0,
+            transaction_handlers: Vec::new(),
+            available_tx_handler: 0,
+            transaction_senders: Vec::new(),
+            available_tx_sender: 0,
+            block_senders: Vec::new(),
+            available_block_sender: 0,
         }));
 
         // Setup the transactions handlers threads
-        let transaction_threads = (0..config.transaction_threads)
+        let transaction_handlers = (0..config.transaction_threads)
             .map(|_| create_transaction_handler(state.clone()))
             .collect::<Vec<Sender<ThreadMsg>>>();
 
-        state.lock().unwrap().transaction_threads = transaction_threads;
+        state.lock().unwrap().transaction_handlers = transaction_handlers;
+
+        // Setup the transactions sender threads
+        let transaction_senders = (0..1)
+            .map(|_| create_transaction_sender())
+            .collect::<Vec<Sender<ThreadMsg>>>();
+
+        state.lock().unwrap().transaction_senders = transaction_senders;
+
+        // Setup the blocks sender threads
+        let block_senders = (0..1)
+            .map(|_| create_block_sender())
+            .collect::<Vec<Sender<ThreadMsg>>>();
+
+        state.lock().unwrap().block_senders = block_senders;
 
         // Verify the integrity of the blockchain
         assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
@@ -263,7 +295,7 @@ impl Node {
 }
 
 /*
- * This makes it easy to handle new incoming transactions in different thread
+ * Create a thread to recive transactions
  */
 fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg> {
     let (tx, rx) = channel();
@@ -275,10 +307,70 @@ fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg>
             loop {
                 let rx = rx.lock().unwrap();
                 let state = state.clone();
-                match rx.recv().unwrap() {
-                    ThreadMsg::AddTransaction(transaction) => {
-                        add_transaction(&state, transaction).await
-                    }
+                if let ThreadMsg::AddTransaction(transaction) = rx.recv().unwrap() {
+                    add_transaction(&state, transaction).await
+                }
+            }
+        })
+    });
+
+    tx
+}
+
+/*
+ * Create a thread to propagate transactions
+ */
+fn create_transaction_sender() -> Sender<ThreadMsg> {
+    let (tx, rx) = channel();
+    let rx = Arc::new(Mutex::new(rx));
+    thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            loop {
+                let rx = rx.lock().unwrap();
+                if let ThreadMsg::PropagateTransaction {
+                    transaction,
+                    hostname,
+                    port,
+                } = rx.recv().unwrap()
+                {
+                    let hostname = hostname.clone();
+                    let port = port;
+                    let transaction = transaction.clone();
+
+                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                        .await
+                        .unwrap();
+                    client.add_transaction(transaction).await.ok();
+                }
+            }
+        })
+    });
+
+    tx
+}
+
+/*
+ * Create a thread to propagate blocks
+ */
+fn create_block_sender() -> Sender<ThreadMsg> {
+    let (tx, rx) = channel();
+    let rx = Arc::new(Mutex::new(rx));
+    thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            loop {
+                let rx = rx.lock().unwrap();
+                if let ThreadMsg::PropagateBlock {
+                    block,
+                    hostname,
+                    port,
+                } = rx.recv().unwrap()
+                {
+                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                        .await
+                        .unwrap();
+                    client.add_block(block).await.ok();
                 }
             }
         })

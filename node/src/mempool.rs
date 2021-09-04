@@ -7,13 +7,28 @@ use crate::Transaction;
 #[derive(Default, Clone)]
 pub struct Mempool {
     pub pending_transactions: HashMap<String, Transaction>,
+    pub cached_transactions: Vec<Transaction>,
 }
 
 impl Mempool {
     pub fn add_transaction(&mut self, transaction: &Transaction) {
         self.pending_transactions
             .insert(transaction.hash_it(), transaction.clone());
+        if self.cached_transactions.len() >= 1000 {
+            self.cached_transactions.pop();
+        }
+        self.cached_transactions.push(transaction.clone());
     }
+
+    pub fn transaction_was_cached(&self, transaction: &Transaction) -> bool {
+        for tx in &self.cached_transactions {
+            if tx.get_hash() == transaction.get_hash() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn remove_transaction(&mut self, transaction_hash: &str) {
         self.pending_transactions.remove(transaction_hash);
     }
@@ -25,6 +40,10 @@ impl Mempool {
         let mut bad_txs = Vec::new();
 
         for tx in pending_transactions {
+            if ok_txs.len() > 700 {
+                break;
+            }
+
             // Make sure the funds are enough and the history is accurate
             if tx.verify()
                 && temporal_chainstate.verify_transaction_ammount(tx)

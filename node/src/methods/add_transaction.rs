@@ -4,7 +4,6 @@ use std::sync::{
 };
 
 use chrono::Utc;
-use client::RPCClient;
 use serde::{
     Deserialize,
     Serialize,
@@ -19,6 +18,7 @@ pub enum TransactionResult {
 use crate::{
     mempool::Mempool,
     NodeState,
+    ThreadMsg,
 };
 use blockchain::{
     BlockBuilder,
@@ -30,15 +30,13 @@ use jsonrpc_http_server::jsonrpc_core::*;
 
 pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transaction) {
     // Check the transaction isn't already added into the mempool
-    let txs_is_not_added = state
+    let was_tx_cached = state
         .lock()
         .unwrap()
         .mempool
-        .pending_transactions
-        .get(&transaction.get_hash())
-        .is_none();
+        .transaction_was_cached(&transaction);
 
-    if !txs_is_not_added {
+    if was_tx_cached {
         return;
     }
 
@@ -56,28 +54,32 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
+        let peers = state.peers.clone();
 
-        // Propagate the transactions to known peers
-        for (i, (hostname, port)) in state.peers.values().enumerate() {
-            if i == 2 {
+        for (i, (hostname, port)) in peers.values().enumerate() {
+            if i == 3 {
                 break;
             }
 
-            let hostname = hostname.clone();
-            let port = *port;
-            let transaction = transaction.clone();
+            // Propagate the transactions to known peers
+            let transaction_senders = state.transaction_senders.clone();
 
-            tokio::spawn(async move {
-                let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                    .await
-                    .unwrap();
-                client.add_transaction(transaction).await.ok();
-            });
+            transaction_senders[state.available_tx_sender]
+                .send(ThreadMsg::PropagateTransaction {
+                    transaction: transaction.clone(),
+                    hostname: hostname.clone(),
+                    port: *port,
+                })
+                .unwrap();
+            state.available_tx_sender += 1;
+            if state.available_tx_sender == transaction_senders.len() {
+                state.available_tx_sender = 0;
+            }
         }
 
         // Minimum transactions per block are harcoded for now
         let mempool_len = state.mempool.pending_transactions.len();
-        if mempool_len > 499 && mempool_len % 50 == 0 {
+        if mempool_len > 500 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes
@@ -87,13 +89,18 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             let elected_forger = state.next_forger.hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
+                // Transform the pending transactions from a hashmap into a vector
                 let mut pending_transactions = state
                     .mempool
                     .pending_transactions
                     .values()
                     .cloned()
                     .collect::<Vec<Transaction>>();
+
+                // Sort transactions from lower history to higher
                 pending_transactions.sort_by_key(|tx| tx.get_history());
+
+                // Only get transactions that can be applied in the current chainstate (funds and history are ok)
                 let mut chainstate = state.blockchain.state.clone();
                 let (mut ok_txs, mut bad_txs) = Mempool::verify_veracity_of_transactions(
                     &mut pending_transactions,
@@ -108,6 +115,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .with_wallet(&mut state.wallet)
                     .build();
 
+                // Also add the block forging reward to the block
                 ok_txs.push(reward_tx);
 
                 let block_data = serde_json::to_string(&ok_txs).unwrap();
@@ -121,6 +129,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .sign_with(&state.wallet)
                     .build();
 
+                // Add the block to the blockchain
                 state.blockchain.add_block(&new_block).unwrap();
 
                 // Elect the next forger
@@ -128,26 +137,31 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
                 ok_txs.append(&mut bad_txs);
 
+                // Remove all good and bad transactions from the mempool
                 for tx in ok_txs {
                     state.mempool.remove_transaction(&tx.get_hash());
                 }
 
-                for (hostname, port) in state.peers.values() {
+                // Propagate the block
+                let block_senders = state.block_senders.clone();
+                let peers = state.peers.clone();
+
+                for (hostname, port) in peers.values() {
                     let hostname = hostname.clone();
                     let port = *port;
-                    let new_block = new_block.clone();
-                    let id = state.id;
+                    let block = new_block.clone();
 
-                    tokio::spawn(async move {
-                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                            .await
-                            .unwrap();
-                        let res = client.add_block(new_block).await;
-
-                        if res.is_err() {
-                            log::error!("(Node.{}) Failed propagating block", id);
-                        }
-                    });
+                    block_senders[state.available_block_sender]
+                        .send(ThreadMsg::PropagateBlock {
+                            block,
+                            hostname,
+                            port,
+                        })
+                        .unwrap();
+                    state.available_block_sender += 1;
+                    if state.available_block_sender == block_senders.len() {
+                        state.available_block_sender = 0;
+                    }
                 }
             }
         }
