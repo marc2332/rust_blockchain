@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use blockchain::{
     Blockchain,
     Key,
@@ -9,6 +11,8 @@ pub enum ConsensusErrors {
     TransactionBroken,
 }
 
+static MINIMUM_BLOCK_DELAY: usize = 1;
+
 /*
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
@@ -16,22 +20,25 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
     let stakings = &blockchain.state.last_staking_addresses;
 
     let last_block = blockchain.chain.last().unwrap();
-    let previous_forger = {
-        if let Some(previous_hash) = last_block.previous_hash.as_ref() {
-            let previous_block = blockchain
-                .get_block_with_hash(previous_hash.unite())
-                .unwrap();
-            Some(previous_block.key.hash_it())
-        } else {
-            None
+    let previous_forgers = {
+        let mut forgers = HashMap::new();
+
+        for block in blockchain.chain.iter().rev() {
+            forgers.insert(block.key.hash_it(), ());
+
+            if forgers.len() == MINIMUM_BLOCK_DELAY {
+                break;
+            }
         }
+
+        forgers
     };
 
     let mut len = last_block.hash.hash.len();
     let mut forger = None;
 
     while len > 0 {
-        for tx in stakings {
+        for tx in stakings.iter().rev() {
             if let Transaction::STAKE {
                 author_public_key,
                 hash,
@@ -39,14 +46,9 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
                 ..
             } = tx
             {
-                if let Some(ref previous_forger) = previous_forger {
-                    if from_address != previous_forger
-                        && hash.contains(&last_block.hash.hash[0..len])
-                    {
-                        forger = Some(author_public_key);
-                        break;
-                    }
-                } else if hash.contains(&last_block.hash.hash[0..len]) {
+                if previous_forgers.get(from_address).is_none()
+                    && hash.contains(&last_block.hash.hash[0..len])
+                {
                     forger = Some(author_public_key);
                     break;
                 }

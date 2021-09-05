@@ -1175,6 +1175,7 @@ dependencies = [
  "crossterm 0.21.0",
  "futures 0.3.16",
  "node",
+ "serde_json",
  "tokio 1.10.0",
  "tui",
 ]

@@ -68,7 +68,7 @@ impl Chainstate {
                 ammount,
                 ..
             } => {
-                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                if let Some(address_info) = self.addresses.get(&from_address.clone()) {
                     address_info.ammount >= *ammount
                 } else {
                     false
@@ -79,7 +79,7 @@ impl Chainstate {
                 ammount,
                 ..
             } => {
-                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                if let Some(address_info) = self.addresses.get(&from_address.clone()) {
                     address_info.ammount >= *ammount
                 } else {
                     false
@@ -100,7 +100,7 @@ impl Chainstate {
                 history,
                 ..
             } => {
-                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                if let Some(address_info) = self.addresses.get(&from_address.clone()) {
                     address_info.history == *history
                 } else {
                     false
@@ -111,7 +111,7 @@ impl Chainstate {
                 history,
                 ..
             } => {
-                if let Some(address_info) = &mut self.addresses.get(&from_address.clone()) {
+                if let Some(address_info) = self.addresses.get(&from_address.clone()) {
                     address_info.history == *history
                 } else {
                     false

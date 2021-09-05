@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use blockchain::Transaction;
 use client::RPCClient;
 use crossterm::{
     event::{
@@ -17,6 +18,7 @@ use crossterm::{
     },
 };
 use std::{
+    convert::TryFrom,
     error::Error,
     io::stdout,
     sync::{
@@ -146,13 +148,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut start_time = Instant::now();
     let times = Arc::new(Mutex::new(vec![1; 5]));
-    let blockchain_data = Arc::new(Mutex::new(vec![0; 5]));
+    let blockchain_data = Arc::new(Mutex::new(vec![("".to_string(), 0); 5]));
     let addresses_data = Arc::new(Mutex::new(vec![("-".to_string(), 0); 5]));
+    let block_size = Arc::new(Mutex::new(50_u128));
 
     for i in 0..5 {
         let blockchain_data = blockchain_data.clone();
         let addresses_data = addresses_data.clone();
         let times = times.clone();
+        let block_size = block_size.clone();
 
         tokio::spawn(async move {
             loop {
@@ -160,12 +164,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     .await
                     .unwrap();
 
-                let blockchain_res = client.get_chain_length().await.unwrap_or(0);
+                let blockchain_res = client
+                    .get_chain_length()
+                    .await
+                    .unwrap_or(("".to_string(), 0));
 
                 if blockchain_data.lock().unwrap()[i] != blockchain_res {
-                    blockchain_data.lock().unwrap()[i] = blockchain_res;
+                    blockchain_data.lock().unwrap()[i] = blockchain_res.clone();
                     let duration = start_time.elapsed();
-                    times.lock().unwrap()[i] = duration.as_secs();
+                    times.lock().unwrap()[i] = duration.as_millis();
                     start_time = Instant::now();
                 }
 
@@ -183,6 +190,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     addresses_data.lock().unwrap()[i] = (node_address, address_data);
                 }
 
+                if i == 0 {
+                    let new_block = client.get_block_with_hash(blockchain_res.0).await;
+
+                    if let Ok(Some(new_block)) = new_block {
+                        let txs: Vec<Transaction> =
+                            serde_json::from_str(&new_block.payload).unwrap();
+                        *block_size.lock().unwrap() = u128::try_from(txs.len()).unwrap()
+                    }
+                }
+
                 let ten_millis = time::Duration::from_millis(1000);
                 thread::sleep(ten_millis);
             }
@@ -194,6 +211,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let addresses_data = addresses_data.clone();
         let times = times.clone();
         let tabs_state = tabs_state.clone();
+        let block_size = block_size.clone();
 
         terminal.draw(move |f| {
             let blockchain_data = blockchain_data.lock().unwrap().to_vec();
@@ -241,14 +259,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             match tabs_state.current {
                 0 => {
                     for i in 0..5 {
-                        let paragraph = Paragraph::new("█".repeat(blockchain_data[i]))
+                        let paragraph = Paragraph::new("█".repeat(blockchain_data[i].1))
                             .style(Style::default().fg(Color::White))
                             .block(
                                 Block::default()
                                     .title(format!(
                                         "node {} (Block height: {})",
                                         i,
-                                        blockchain_data[i].to_string()
+                                        blockchain_data[i].1.to_string()
                                     ))
                                     .borders(Borders::ALL),
                             )
@@ -268,15 +286,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                     // 500 txs is the block size
                     let tps = {
-                        if block_creation_avg == 0 {
+                        if block_creation_avg <= 1 {
                             0
                         } else {
-                            500 / block_creation_avg
+                            *block_size.lock().unwrap() / (block_creation_avg / 1000)
                         }
                     };
 
                     let paragraph = Paragraph::new(format!(
-                        "Block time = {}s | TPS = {}",
+                        "Block time = {}ms | TPS = {}",
                         block_creation_avg, tps
                     ))
                     .style(Style::default().fg(Color::White))

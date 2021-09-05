@@ -57,10 +57,9 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         let peers = state.peers.clone();
 
         for (i, (hostname, port)) in peers.values().enumerate() {
-            if i == 3 {
+            if i == 2 {
                 break;
             }
-
             // Propagate the transactions to known peers
             let transaction_senders = state.transaction_senders.clone();
 
@@ -79,7 +78,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
         // Minimum transactions per block are harcoded for now
         let mempool_len = state.mempool.pending_transactions.len();
-        if mempool_len > 500 {
+        if mempool_len > 100 {
             /*
              * The elected forget is the one who must forge the block
              * This block will then by propagated to other nodes

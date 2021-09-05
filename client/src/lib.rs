@@ -39,8 +39,9 @@ impl RPCClient {
 }
 
 impl RPCClient {
-    pub fn get_chain_length(&self) -> impl Future<Output = RpcResult<usize>> {
-        self.0.call_method("get_chain_length", "Number", ())
+    pub fn get_chain_length(&self) -> impl Future<Output = RpcResult<(String, usize)>> {
+        self.0
+            .call_method("get_chain_length", "(String, Number)", ())
     }
 
     pub fn make_handshake(&self, req: HandshakeRequest) -> impl Future<Output = RpcResult<()>> {
@@ -69,5 +70,13 @@ impl RPCClient {
 
     pub fn get_address_ammount(&self, address: String) -> impl Future<Output = RpcResult<u64>> {
         self.0.call_method("get_address_ammount", "u64", (address,))
+    }
+
+    pub fn get_block_with_hash(
+        &self,
+        hash: String,
+    ) -> impl Future<Output = RpcResult<Option<Block>>> {
+        self.0
+            .call_method("get_block_with_hash", "Option<Block>", (hash,))
     }
 }

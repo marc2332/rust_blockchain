@@ -16,9 +16,5 @@ pub fn get_block_with_prev_hash(
         .blockchain
         .get_block_with_prev_hash(previous_hash);
 
-    if res.is_some() {
-        Ok(res)
-    } else {
-        Ok(None)
-    }
+    Ok(res)
 }

@@ -14,7 +14,7 @@ use crate::Key;
 
 static HASH_VERSION: u8 = 1;
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct BlockHash {
     pub hash: String,
     pub version: u8,

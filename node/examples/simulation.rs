@@ -33,7 +33,7 @@ fn create_nodes() -> Vec<(Node, Configuration)> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                10,
+                1,
             );
 
             let node = Node::new();
@@ -95,7 +95,7 @@ async fn main() {
 
     let mut senders_threads = Vec::new();
 
-    let senders = 4;
+    let senders = 3;
 
     for i in 0..senders {
         let (tx, sender) = create_sender(&mut genesis_wallet, i);

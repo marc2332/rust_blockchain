@@ -38,6 +38,7 @@ use methods::{
     add_block,
     add_transaction,
     get_address_ammount,
+    get_block_with_hash,
     get_block_with_prev_hash,
     get_chain_length,
     get_node_address,
@@ -55,7 +56,7 @@ use mempool::Mempool;
 #[rpc]
 pub trait RpcMethods {
     #[rpc(name = "get_chain_length")]
-    fn get_chain_length(&self) -> Result<usize>;
+    fn get_chain_length(&self) -> Result<(String, usize)>;
 
     #[rpc(name = "make_handshake")]
     fn make_handshake(&self, req: HandshakeRequest) -> Result<()>;
@@ -74,6 +75,9 @@ pub trait RpcMethods {
 
     #[rpc(name = "get_address_ammount")]
     fn get_address_ammount(&self, address: String) -> Result<u64>;
+
+    #[rpc(name = "get_block_with_hash")]
+    fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>>;
 }
 
 struct RpcManager {
@@ -81,7 +85,7 @@ struct RpcManager {
 }
 
 impl RpcMethods for RpcManager {
-    fn get_chain_length(&self) -> Result<usize> {
+    fn get_chain_length(&self) -> Result<(String, usize)> {
         get_chain_length(&self.state)
     }
 
@@ -120,6 +124,10 @@ impl RpcMethods for RpcManager {
 
     fn get_address_ammount(&self, address: String) -> Result<u64> {
         Ok(get_address_ammount(&self.state, address))
+    }
+
+    fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>> {
+        get_block_with_hash(&self.state, hash)
     }
 }
 
@@ -255,7 +263,7 @@ impl Node {
         // Verify the integrity of the blockchain
         assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
 
-        // Handshark known nodes
+        // Handshake known nodes
         tokio::spawn(async move {
             for (hostname, port) in peers.values() {
                 let handshake = HandshakeRequest {
