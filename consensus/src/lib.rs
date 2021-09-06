@@ -11,8 +11,6 @@ pub enum ConsensusErrors {
     TransactionBroken,
 }
 
-static MINIMUM_BLOCK_DELAY: usize = 1;
-
 /*
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
@@ -26,7 +24,7 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
         for block in blockchain.chain.iter().rev() {
             forgers.insert(block.key.hash_it(), ());
 
-            if forgers.len() == MINIMUM_BLOCK_DELAY {
+            if forgers.len() == stakings.len() - 2 {
                 break;
             }
         }
@@ -38,7 +36,7 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
     let mut forger = None;
 
     while len > 0 {
-        for tx in stakings.iter().rev() {
+        for tx in stakings.iter() {
             if let Transaction::STAKE {
                 author_public_key,
                 hash,

@@ -18,5 +18,5 @@ pub fn get_chain_length(state: &Arc<Mutex<NodeState>>) -> Result<(String, usize)
             String::new()
         }
     };
-    Ok((last_hash.clone(), index))
+    Ok((last_hash, index))
 }

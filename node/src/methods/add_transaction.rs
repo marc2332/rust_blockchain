@@ -78,13 +78,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
         // Minimum transactions per block are harcoded for now
         let mempool_len = state.mempool.pending_transactions.len();
-        if mempool_len > 100 {
-            /*
-             * The elected forget is the one who must forge the block
-             * This block will then by propagated to other nodes
-             * If another node tries to propagate a block with a wrong forger it should be punished and ignored
-             * WIP
-             */
+        if mempool_len > 50 {
             let elected_forger = state.next_forger.hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
@@ -98,7 +92,6 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
                 // Sort transactions from lower history to higher
                 pending_transactions.sort_by_key(|tx| tx.get_history());
-
                 // Only get transactions that can be applied in the current chainstate (funds and history are ok)
                 let mut chainstate = state.blockchain.state.clone();
                 let (mut ok_txs, mut bad_txs) = Mempool::verify_veracity_of_transactions(

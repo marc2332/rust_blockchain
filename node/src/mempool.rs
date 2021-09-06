@@ -32,6 +32,24 @@ impl Mempool {
     pub fn remove_transaction(&mut self, transaction_hash: &str) {
         self.pending_transactions.remove(transaction_hash);
     }
+
+    pub fn verify_veracity_of_incoming_transactions(
+        pending_transactions: &mut Vec<Transaction>,
+        temporal_chainstate: &mut Chainstate,
+    ) -> bool {
+        for tx in pending_transactions {
+            if tx.verify()
+                && temporal_chainstate.verify_transaction_ammount(tx)
+                && temporal_chainstate.verify_transaction_history(tx)
+            {
+                temporal_chainstate.effect_transaction(tx);
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn verify_veracity_of_transactions(
         pending_transactions: &mut Vec<Transaction>,
         temporal_chainstate: &mut Chainstate,
@@ -40,13 +58,12 @@ impl Mempool {
         let mut bad_txs = Vec::new();
 
         for tx in pending_transactions {
-            if ok_txs.len() > 250 {
+            if ok_txs.len() > 500 {
                 break;
             }
 
             // Make sure the funds are enough and the history is accurate
-            if tx.verify()
-                && temporal_chainstate.verify_transaction_ammount(tx)
+            if temporal_chainstate.verify_transaction_ammount(tx)
                 && temporal_chainstate.verify_transaction_history(tx)
             {
                 temporal_chainstate.effect_transaction(tx);

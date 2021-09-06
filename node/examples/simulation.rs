@@ -23,7 +23,7 @@ use std::{
 };
 
 fn create_nodes() -> Vec<(Node, Configuration)> {
-    (0..5)
+    (0..7)
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
@@ -95,12 +95,12 @@ async fn main() {
 
     let mut senders_threads = Vec::new();
 
-    let senders = 3;
-
-    for i in 0..senders {
-        let (tx, sender) = create_sender(&mut genesis_wallet, i);
-        transactions.push(tx);
-        senders_threads.push(sender);
+    for _ in 0..2 {
+        for i in 0..7 {
+            let (tx, sender) = create_sender(&mut genesis_wallet, i);
+            transactions.push(tx);
+            senders_threads.push(sender);
+        }
     }
 
     let block_data = serde_json::to_string(&transactions).unwrap();

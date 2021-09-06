@@ -223,12 +223,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .direction(Direction::Vertical)
                 .constraints(
                     [
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
+                        Constraint::Percentage(10),
+                        Constraint::Percentage(17),
+                        Constraint::Percentage(17),
+                        Constraint::Percentage(17),
+                        Constraint::Percentage(17),
+                        Constraint::Percentage(17),
                         Constraint::Percentage(5),
                     ]
                     .as_ref(),
