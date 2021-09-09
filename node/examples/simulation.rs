@@ -22,23 +22,19 @@ use std::{
     time,
 };
 
-fn create_nodes() -> Vec<(Node, Configuration)> {
+fn create_configs() -> Vec<Configuration> {
     (0..7)
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
-            let config = Configuration::from_params(
+            Configuration::from_params(
                 i,
                 &format!("db_{}", i),
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
                 1,
-            );
-
-            let node = Node::new();
-
-            (node, config)
+            )
         })
         .collect()
 }
@@ -57,11 +53,13 @@ async fn main() {
         .init()
         .unwrap();
 
-    let mut nodes = create_nodes();
+    let mut node_configurations = create_configs();
 
     let mut nodes_runtimes = Vec::new();
 
     let mut genesis_wallet = Wallet::default();
+
+    println!("{:?}", genesis_wallet.get_private().0);
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&genesis_wallet.get_public().hash_it())
@@ -71,9 +69,9 @@ async fn main() {
         .build();
 
     // Make a coinbase and a stake transaction fore very node
-    let mut staking_transactions = nodes
+    let mut staking_transactions = node_configurations
         .iter_mut()
-        .flat_map(|(_, config)| {
+        .flat_map(|config| {
             vec![
                 TransactionBuilder::new()
                     .to_address(&config.wallet.get_public().hash_it())
@@ -113,9 +111,8 @@ async fn main() {
         .sign_with(&genesis_wallet)
         .build();
 
-    println!("{:?}", genesis_wallet.get_private().0);
-
-    for (node, config) in nodes {
+    for config in node_configurations {
+        let node = Node::new(config.clone());
         let mut blockchain =
             Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
 
@@ -127,7 +124,7 @@ async fn main() {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 let mut node = node.clone();
-                node.run(config.clone()).await;
+                node.run().await;
             })
         }));
     }

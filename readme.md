@@ -16,7 +16,7 @@ WIP.
 - Openssl
 
 ## Run simulation (WIP)
-In one terminal run:
+Run:
 ```shell
 cd node
 cargo run --example simulation

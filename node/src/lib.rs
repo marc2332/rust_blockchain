@@ -163,29 +163,26 @@ pub enum ThreadMsg {
 }
 
 #[derive(Clone)]
-pub struct Node {}
-
-impl Default for Node {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct Node {
+    config: Configuration,
 }
 
 impl Node {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config: Configuration) -> Self {
+        Self { config }
     }
 
-    pub async fn run(&mut self, config: Configuration) {
-        log::info!("(Node.{}) Booting up node...", config.id);
+    pub async fn run(&mut self) {
+        log::info!("(Node.{}) Booting up node...", self.config.id);
 
         // Setup the blockchain
-        let blockchain = Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
+        let blockchain =
+            Blockchain::new("mars", Arc::new(std::sync::Mutex::new(self.config.clone())));
 
-        let wallet = config.wallet.clone();
-        let id = config.id;
-        let hostname = config.hostname.clone();
-        let rpc_port = config.rpc_port;
+        let wallet = self.config.wallet.clone();
+        let id = self.config.id;
+        let hostname = self.config.hostname.clone();
+        let rpc_port = self.config.rpc_port;
 
         // Fetch new peers from a discovery server (WIP)
         let peers = {
@@ -229,7 +226,7 @@ impl Node {
             peers: peers.clone(),
             lost_blocks: HashMap::new(),
             wallet: wallet.clone(),
-            id: config.id,
+            id: self.config.id,
             next_forger: next_forger.clone(),
             transaction_handlers: Vec::new(),
             available_tx_handler: 0,
@@ -240,7 +237,7 @@ impl Node {
         }));
 
         // Setup the transactions handlers threads
-        let transaction_handlers = (0..config.transaction_threads)
+        let transaction_handlers = (0..self.config.transaction_threads)
             .map(|_| create_transaction_handler(state.clone()))
             .collect::<Vec<Sender<ThreadMsg>>>();
 
