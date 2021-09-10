@@ -5,8 +5,9 @@
 - [ ] Prioritize sending transactions to the next block forger
 - [x] Improve the election algorithm
 - [x] Use `enum` instead of `struct` to easily have different types of Transactions inside the blocks 
-- [ ] Make the discovery server a library and make a different crate to launch it as cli, this way the discovery server could be launched right from the simulation example
-- [ ] Variable fees
+- [x] Make the discovery server a library,this way the discovery server could be launched right from the simulation example
+- [ ] Synchronization support
+- [ ] Fees ?
 - [x] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
 - [x] Scalable block size relative to the network performance
 - [ ] Always have just the X last blocks of the blockchain on memory to avoid infinite memory increase

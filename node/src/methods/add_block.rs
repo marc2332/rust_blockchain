@@ -17,7 +17,7 @@ use jsonrpc_http_server::jsonrpc_core::*;
 
 pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
     let is_block_ok = {
-        let elected_forger = state.lock().unwrap().next_forger.clone();
+        let elected_forger = state.lock().unwrap().next_forger.as_ref().unwrap().clone();
 
         // Make sure elected forger is the right one
         if block.verify_sign_with(&PublicAddress::from(&elected_forger)) {
@@ -39,9 +39,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             .is_ok()
         {
             // Elect the next forger
-            let next_forger = consensus::elect_forger(&state.lock().unwrap().blockchain).unwrap();
-
-            state.lock().unwrap().next_forger = next_forger;
+            state.lock().unwrap().elect_new_forger();
 
             let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
@@ -99,8 +97,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                     blocks_iter = blocks.clone().into_iter().peekable();
 
                     // Elect next block forger
-                    let next_forger = consensus::elect_forger(&state.blockchain).unwrap();
-                    state.next_forger = next_forger;
+                    state.elect_new_forger();
 
                     // Remove confirmed transactions from the mempool
                     let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();

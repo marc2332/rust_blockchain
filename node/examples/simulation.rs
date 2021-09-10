@@ -59,7 +59,7 @@ async fn main() {
 
     let mut genesis_wallet = Wallet::default();
 
-    println!("{:?}", genesis_wallet.get_private().0);
+    log::info!("Starting simulation");
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&genesis_wallet.get_public().hash_it())
@@ -112,18 +112,23 @@ async fn main() {
         .build();
 
     for config in node_configurations {
-        let node = Node::new(config.clone());
-        let mut blockchain =
-            Blockchain::new("mars", Arc::new(std::sync::Mutex::new(config.clone())));
+        let mut node = Node::new(config.clone());
+        let genesis_block = genesis_block.clone();
 
-        // Create a genesis block if there isn't
-        if blockchain.last_block_hash.is_none() {
-            blockchain.add_block(&genesis_block).unwrap();
-        }
         nodes_runtimes.push(thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
-                let mut node = node.clone();
+                node.sync_from_discovery_server().await;
+                let mut state = node.state.lock().unwrap();
+
+                // Create a genesis block if there isn't
+                if state.blockchain.last_block_hash.is_none() {
+                    state.blockchain.add_block(&genesis_block).unwrap();
+                    state.elect_new_forger();
+                }
+
+                drop(state);
+
                 node.run().await;
             })
         }));

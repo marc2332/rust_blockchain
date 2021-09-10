@@ -35,13 +35,10 @@ pub enum BlockchainErrors {
 }
 
 impl Blockchain {
-    pub fn new(name: &str, config: Arc<Mutex<Configuration>>) -> Self {
-        let chain = config.lock().unwrap().get_blocks(name).unwrap();
+    pub fn new(name: &str, config: Configuration) -> Self {
+        let chain = config.get_blocks(name).unwrap();
 
-        log::info!(
-            "(Node.{}) Loaded blockchain from database",
-            config.lock().unwrap().id
-        );
+        log::info!("(Node.{}) Loaded blockchain from database", config.id);
 
         let index = chain.len() as usize;
 
@@ -50,6 +47,8 @@ impl Blockchain {
         } else {
             None
         };
+
+        let config = Arc::new(Mutex::new(config));
 
         let mut state = Chainstate::new(config.clone());
 

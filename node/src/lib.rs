@@ -135,17 +135,24 @@ impl RpcMethods for RpcManager {
 pub struct NodeState {
     pub blockchain: Blockchain,
     pub lost_blocks: HashMap<String, Block>,
-    pub peers: HashMap<String, (String, u16)>,
     pub mempool: Mempool,
     pub wallet: Wallet,
     pub id: u16,
-    pub next_forger: Key,
+    pub next_forger: Option<Key>,
     pub transaction_handlers: Vec<Sender<ThreadMsg>>,
     pub available_tx_handler: usize,
     pub transaction_senders: Vec<Sender<ThreadMsg>>,
     pub available_tx_sender: usize,
     pub block_senders: Vec<Sender<ThreadMsg>>,
     pub available_block_sender: usize,
+    pub peers: HashMap<String, (String, u16)>,
+}
+
+impl NodeState {
+    pub fn elect_new_forger(&mut self) {
+        let next_forger = consensus::elect_forger(&self.blockchain).unwrap();
+        self.next_forger = Some(next_forger);
+    }
 }
 
 pub enum ThreadMsg {
@@ -164,101 +171,109 @@ pub enum ThreadMsg {
 
 #[derive(Clone)]
 pub struct Node {
-    config: Configuration,
+    pub config: Configuration,
+    pub state: Arc<Mutex<NodeState>>,
 }
 
 impl Node {
     pub fn new(config: Configuration) -> Self {
-        Self { config }
-    }
+        let blockchain = Blockchain::new("mars", config.clone());
 
-    pub async fn run(&mut self) {
-        log::info!("(Node.{}) Booting up node...", self.config.id);
-
-        // Setup the blockchain
-        let blockchain =
-            Blockchain::new("mars", Arc::new(std::sync::Mutex::new(self.config.clone())));
-
-        let wallet = self.config.wallet.clone();
-        let id = self.config.id;
-        let hostname = self.config.hostname.clone();
-        let rpc_port = self.config.rpc_port;
-
-        // Fetch new peers from a discovery server (WIP)
-        let peers = {
-            let sign = wallet.sign_data(wallet.get_public().hash_it());
-
-            let obj = serde_json::json!({
-                "address": wallet.get_public().hash_it(),
-                "port": rpc_port,
-                "key": wallet.get_public(),
-                "sign": sign,
-            });
-            let client = reqwest::Client::new();
-
-            let res = client
-                .post("http://localhost:33140/signal")
-                .json(&obj)
-                .send()
-                .await;
-
-            let mut peers = match res {
-                Ok(res) => res.json::<HashMap<String, (String, u16)>>().await.unwrap(),
-                _ => HashMap::new(),
-            };
-
-            let address = wallet.get_public().hash_it();
-
-            if peers.get(&address).is_some() {
-                peers.remove(&address);
-            }
-
-            peers
-        };
-
-        // Elect the next block forger
-        let next_forger = consensus::elect_forger(&blockchain).unwrap();
+        let wallet = config.wallet.clone();
+        let id = config.id;
 
         // Create the node state
         let state = Arc::new(std::sync::Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),
-            peers: peers.clone(),
             lost_blocks: HashMap::new(),
-            wallet: wallet.clone(),
-            id: self.config.id,
-            next_forger: next_forger.clone(),
+            wallet,
+            id,
+            next_forger: None,
             transaction_handlers: Vec::new(),
             available_tx_handler: 0,
             transaction_senders: Vec::new(),
             available_tx_sender: 0,
             block_senders: Vec::new(),
             available_block_sender: 0,
+            peers: HashMap::new(),
         }));
+
+        Self { config, state }
+    }
+
+    pub async fn sync_from_discovery_server(&mut self) {
+        let wallet = self.config.wallet.clone();
+        let rpc_port = self.config.rpc_port;
+
+        let sign = wallet.sign_data(wallet.get_public().hash_it());
+
+        let obj = serde_json::json!({
+            "address": wallet.get_public().hash_it(),
+            "port": rpc_port,
+            "key": wallet.get_public(),
+            "sign": sign,
+        });
+        let client = reqwest::Client::new();
+
+        let res = client
+            .post("http://localhost:33140/signal")
+            .json(&obj)
+            .send()
+            .await;
+
+        let mut peers = match res {
+            Ok(res) => res.json::<HashMap<String, (String, u16)>>().await.unwrap(),
+            _ => HashMap::new(),
+        };
+
+        let address = wallet.get_public().hash_it();
+
+        if peers.get(&address).is_some() {
+            peers.remove(&address);
+        }
+
+        self.state.lock().unwrap().peers = peers;
+    }
+
+    pub async fn run(&mut self) {
+        log::info!("(Node.{}) Booting up node...", self.config.id);
 
         // Setup the transactions handlers threads
         let transaction_handlers = (0..self.config.transaction_threads)
-            .map(|_| create_transaction_handler(state.clone()))
+            .map(|_| create_transaction_handler(self.state.clone()))
             .collect::<Vec<Sender<ThreadMsg>>>();
 
-        state.lock().unwrap().transaction_handlers = transaction_handlers;
+        self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
         // Setup the transactions sender threads
         let transaction_senders = (0..1)
             .map(|_| create_transaction_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
-        state.lock().unwrap().transaction_senders = transaction_senders;
+        self.state.lock().unwrap().transaction_senders = transaction_senders;
 
         // Setup the blocks sender threads
         let block_senders = (0..1)
             .map(|_| create_block_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
-        state.lock().unwrap().block_senders = block_senders;
+        self.state.lock().unwrap().block_senders = block_senders;
 
         // Verify the integrity of the blockchain
-        assert!(state.lock().unwrap().blockchain.verify_integrity().is_ok());
+        assert!(self
+            .state
+            .lock()
+            .unwrap()
+            .blockchain
+            .verify_integrity()
+            .is_ok());
+
+        let wallet = self.config.wallet.clone();
+        let rpc_port = self.config.rpc_port;
+        let peers = self.state.lock().unwrap().peers.clone();
+        let hostname = self.config.hostname.clone();
+        let id = self.config.id;
 
         // Handshake known nodes
         tokio::spawn(async move {
@@ -279,7 +294,9 @@ impl Node {
 
         // Setup the JSON RPC server
         let mut io = IoHandler::default();
-        let manager = RpcManager { state };
+        let manager = RpcManager {
+            state: self.state.clone(),
+        };
         io.extend_with(manager.to_delegate());
 
         tokio::task::spawn_blocking(move || {

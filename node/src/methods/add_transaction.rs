@@ -79,7 +79,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Minimum transactions per block are harcoded for now
         let mempool_len = state.mempool.pending_transactions.len();
         if mempool_len > 50 {
-            let elected_forger = state.next_forger.hash_it();
+            let elected_forger = state.next_forger.as_ref().unwrap().hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
                 // Transform the pending transactions from a hashmap into a vector
@@ -125,7 +125,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                 state.blockchain.add_block(&new_block).unwrap();
 
                 // Elect the next forger
-                state.next_forger = consensus::elect_forger(&state.blockchain).unwrap();
+                state.elect_new_forger();
 
                 ok_txs.append(&mut bad_txs);
 
