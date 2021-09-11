@@ -150,7 +150,7 @@ pub struct NodeState {
 
 impl NodeState {
     pub fn elect_new_forger(&mut self) {
-        let next_forger = consensus::elect_forger(&self.blockchain).unwrap();
+        let next_forger = consensus::elect_forger(&mut self.blockchain).unwrap();
         self.next_forger = Some(next_forger);
     }
 }
@@ -259,15 +259,6 @@ impl Node {
             .collect::<Vec<Sender<ThreadMsg>>>();
 
         self.state.lock().unwrap().block_senders = block_senders;
-
-        // Verify the integrity of the blockchain
-        assert!(self
-            .state
-            .lock()
-            .unwrap()
-            .blockchain
-            .verify_integrity()
-            .is_ok());
 
         let wallet = self.config.wallet.clone();
         let rpc_port = self.config.rpc_port;

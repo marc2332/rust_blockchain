@@ -17,13 +17,12 @@ use log::LevelFilter;
 use node::Node;
 use simple_logger::SimpleLogger;
 use std::{
-    sync::Arc,
     thread,
     time,
 };
 
 fn create_configs() -> Vec<Configuration> {
-    (0..7)
+    (0..5)
         .map(|i| {
             std::fs::remove_dir_all(&format!("db_{}", i)).ok();
 
@@ -34,6 +33,7 @@ fn create_configs() -> Vec<Configuration> {
                 "127.0.0.1",
                 Wallet::default(),
                 1,
+                50,
             )
         })
         .collect()

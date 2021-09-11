@@ -12,6 +12,7 @@ pub struct Configuration {
     pub hostname: String,
     pub wallet: Wallet,
     pub transaction_threads: u16,
+    pub chain_memory_length: u16,
 }
 
 impl Configuration {
@@ -24,6 +25,7 @@ impl Configuration {
             hostname: "0.0.0.0".to_string(),
             wallet: Wallet::default(),
             transaction_threads: 5,
+            chain_memory_length: 300,
         }
     }
 
@@ -34,6 +36,7 @@ impl Configuration {
         hostname: &str,
         wallet: Wallet,
         transaction_threads: u16,
+        chain_memory_length: u16,
     ) -> Self {
         let db = sled::open(db_name).unwrap();
         Self {
@@ -43,6 +46,7 @@ impl Configuration {
             hostname: hostname.to_string(),
             wallet,
             transaction_threads,
+            chain_memory_length,
         }
     }
 

@@ -14,9 +14,7 @@ use chrono::Utc;
 
 #[test]
 fn test() {
-    let config = Arc::new(Mutex::new(Configuration::new()));
-
-    let mut blockchain = Blockchain::new("mars", config);
+    let mut blockchain = Blockchain::new("mars", Configuration::new());
 
     assert!(blockchain.verify_integrity().is_ok());
 

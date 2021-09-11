@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use blockchain::{
     Blockchain,
     Key,
@@ -14,23 +12,10 @@ pub enum ConsensusErrors {
 /*
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
-pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
+pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors> {
     let stakings = &blockchain.state.last_staking_addresses;
 
     let last_block = blockchain.chain.last().unwrap();
-    let previous_forgers = {
-        let mut forgers = HashMap::new();
-
-        for block in blockchain.chain.iter().rev() {
-            forgers.insert(block.key.hash_it(), ());
-
-            if forgers.len() == stakings.len() - 2 {
-                break;
-            }
-        }
-
-        forgers
-    };
 
     let mut len = last_block.hash.hash.len();
     let mut forger = None;
@@ -44,10 +29,17 @@ pub fn elect_forger(blockchain: &Blockchain) -> Result<Key, ConsensusErrors> {
                 ..
             } = tx
             {
-                if previous_forgers.get(from_address).is_none()
+                if !blockchain.state.has_forger(from_address)
                     && hash.contains(&last_block.hash.hash[0..len])
                 {
+                    if blockchain.state.last_forgers.len() > stakings.len() - 2 {
+                        blockchain.state.last_forgers.remove(0);
+                    }
+
+                    blockchain.state.last_forgers.push(from_address.to_string());
+
                     forger = Some(author_public_key);
+
                     break;
                 }
             }

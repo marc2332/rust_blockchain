@@ -23,6 +23,7 @@ pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
     pub addresses: HashMap<String, AddressInfo>,
     pub last_staking_addresses: Vec<Transaction>,
+    pub last_forgers: Vec<String>,
 }
 
 impl Chainstate {
@@ -31,7 +32,17 @@ impl Chainstate {
             config,
             addresses: HashMap::new(),
             last_staking_addresses: Vec::new(),
+            last_forgers: Vec::new(),
         }
+    }
+
+    pub fn has_forger(&self, address: &str) -> bool {
+        for forger in &self.last_forgers {
+            if forger == address {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn get_address_ammount(&self, address: String) -> u64 {

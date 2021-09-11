@@ -36,7 +36,7 @@ pub enum BlockchainErrors {
 
 impl Blockchain {
     pub fn new(name: &str, config: Configuration) -> Self {
-        let chain = config.get_blocks(name).unwrap();
+        let mut chain = config.get_blocks(name).unwrap();
 
         log::info!("(Node.{}) Loaded blockchain from database", config.id);
 
@@ -48,13 +48,23 @@ impl Blockchain {
             None
         };
 
+        // Make sure the integrity of the chain is OK
+        assert!(verify_integrity(&chain).is_ok());
+
         let config = Arc::new(Mutex::new(config));
 
         let mut state = Chainstate::new(config.clone());
 
         state.load_from_chain(name);
 
-        assert!(verify_integrity(&chain).is_ok());
+        let chain_memory_length = config.lock().unwrap().chain_memory_length;
+
+        // Just keep the last configured length of blocks in memory
+        if chain.len() >= chain_memory_length.into() {
+            chain.reverse();
+            chain.truncate(chain_memory_length.into());
+            chain.reverse();
+        }
 
         Self {
             name: name.to_string(),
@@ -113,6 +123,13 @@ impl Blockchain {
                 self.chain.push(block.clone());
                 self.last_block_hash = Some(block.hash.clone());
 
+                let chain_memory_length = self.config.lock().unwrap().chain_memory_length;
+
+                // Fix the in-memory length of the chain to the configured one
+                if self.chain.len() > chain_memory_length.into() {
+                    self.chain.pop();
+                }
+
                 log::info!(
                     "(Node.{}) Added block -> {:?} (size of {})",
                     self.config.lock().unwrap().id,
@@ -133,7 +150,7 @@ impl Blockchain {
     }
 
     /*
-     * Return HashMap's iterator
+     * Return the chain iterator
      */
     pub fn iter(&self) -> std::slice::Iter<Block> {
         self.chain.iter()
