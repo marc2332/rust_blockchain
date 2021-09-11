@@ -2,7 +2,6 @@
 #![feature(async_closure)]
 use blockchain::{
     BlockBuilder,
-    Blockchain,
     Configuration,
     Transaction,
     TransactionBuilder,

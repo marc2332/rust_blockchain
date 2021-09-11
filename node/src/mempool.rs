@@ -15,7 +15,7 @@ impl Mempool {
         self.pending_transactions
             .insert(transaction.hash_it(), transaction.clone());
         if self.cached_transactions.len() >= 1000 {
-            self.cached_transactions.pop();
+            self.cached_transactions.remove(0);
         }
         self.cached_transactions.push(transaction.clone());
     }

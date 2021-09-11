@@ -32,7 +32,7 @@ pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors>
                 if !blockchain.state.has_forger(from_address)
                     && hash.contains(&last_block.hash.hash[0..len])
                 {
-                    if blockchain.state.last_forgers.len() > stakings.len() - 2 {
+                    if blockchain.state.last_forgers.len() >= stakings.len() - 2 {
                         blockchain.state.last_forgers.remove(0);
                     }
 

@@ -127,7 +127,7 @@ impl Blockchain {
 
                 // Fix the in-memory length of the chain to the configured one
                 if self.chain.len() > chain_memory_length.into() {
-                    self.chain.pop();
+                    self.chain.remove(0);
                 }
 
                 log::info!(
