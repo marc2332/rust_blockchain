@@ -25,6 +25,7 @@ use jsonrpc_core::{
     Result,
 };
 use jsonrpc_derive::rpc;
+use std::iter::FromIterator;
 
 pub mod mempool;
 pub mod methods;
@@ -231,6 +232,16 @@ impl Node {
 
         if peers.get(&address).is_some() {
             peers.remove(&address);
+        }
+
+        if peers.len() > 4 {
+            let nodes_peers = peers.clone();
+            let addresses = Vec::from_iter(nodes_peers.iter());
+            for (address, _) in addresses.iter() {
+                if peers.len() > 4 {
+                    peers.remove(&address.to_string());
+                }
+            }
         }
 
         self.state.lock().unwrap().peers = peers;

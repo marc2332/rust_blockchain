@@ -1,20 +1,3 @@
-use std::sync::{
-    Arc,
-    Mutex,
-};
-
-use chrono::Utc;
-use serde::{
-    Deserialize,
-    Serialize,
-};
-
-#[derive(Serialize, Deserialize)]
-pub enum TransactionResult {
-    Verified,
-    BadVerification,
-}
-
 use crate::{
     mempool::Mempool,
     NodeState,
@@ -26,17 +9,32 @@ use blockchain::{
     TransactionBuilder,
     TransactionType,
 };
+use chrono::Utc;
 use jsonrpc_http_server::jsonrpc_core::*;
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use std::sync::{
+    Arc,
+    Mutex,
+};
+
+#[derive(Serialize, Deserialize)]
+pub enum TransactionResult {
+    Verified,
+    BadVerification,
+}
 
 pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transaction) {
     // Check the transaction isn't already added into the mempool
-    let was_tx_cached = state
+    let is_tx_cached = state
         .lock()
         .unwrap()
         .mempool
-        .transaction_was_cached(&transaction);
+        .is_transaction_cached(&transaction);
 
-    if was_tx_cached {
+    if is_tx_cached {
         return;
     }
 
@@ -54,13 +52,10 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
-        let peers = state.peers.clone();
 
-        for (i, (hostname, port)) in peers.values().enumerate() {
-            if i == 2 {
-                break;
-            }
-            // Propagate the transactions to known peers
+        // Propagate the transactions to known peers
+        let peers = state.peers.clone();
+        for (hostname, port) in peers.values() {
             let transaction_senders = state.transaction_senders.clone();
 
             transaction_senders[state.available_tx_sender]
@@ -92,10 +87,11 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
                 // Sort transactions from lower history to higher
                 pending_transactions.sort_by_key(|tx| tx.get_history());
+
                 // Only get transactions that can be applied in the current chainstate (funds and history are ok)
                 let mut chainstate = state.blockchain.state.clone();
                 let (mut ok_txs, mut bad_txs) = Mempool::verify_veracity_of_transactions(
-                    &mut pending_transactions,
+                    &pending_transactions,
                     &mut chainstate,
                 );
 

@@ -11,14 +11,14 @@ use crate::{
     Transaction,
 };
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct AddressInfo {
     pub ammount: u64,
     // aka nonce
     pub history: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Chainstate {
     pub config: Arc<Mutex<Configuration>>,
     pub addresses: HashMap<String, AddressInfo>,

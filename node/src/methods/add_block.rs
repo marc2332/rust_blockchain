@@ -21,10 +21,10 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
 
         // Make sure elected forger is the right one
         if block.verify_sign_with(&PublicAddress::from(&elected_forger)) {
-            let mut transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+            let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
             let mut chainstate = state.lock().unwrap().blockchain.state.clone();
 
-            Mempool::verify_veracity_of_incoming_transactions(&mut transactions, &mut chainstate)
+            Mempool::verify_veracity_of_incoming_transactions(&transactions, &mut chainstate)
         } else {
             false
         }

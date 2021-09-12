@@ -4,7 +4,7 @@ use crate::{
     Wallet,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Configuration {
     pub id: u16,
     pub db: sled::Db,
@@ -110,6 +110,7 @@ impl Configuration {
         );
 
         if result.is_ok() {
+            blocks.flush().unwrap();
             Ok(())
         } else {
             Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))

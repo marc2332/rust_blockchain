@@ -1,8 +1,3 @@
-use std::sync::{
-    Arc,
-    Mutex,
-};
-
 use blockchain::{
     BlockBuilder,
     Blockchain,

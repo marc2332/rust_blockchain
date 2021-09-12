@@ -14,13 +14,15 @@ impl Mempool {
     pub fn add_transaction(&mut self, transaction: &Transaction) {
         self.pending_transactions
             .insert(transaction.hash_it(), transaction.clone());
+
+        self.cached_transactions.push(transaction.clone());
+
         if self.cached_transactions.len() >= 1000 {
             self.cached_transactions.remove(0);
         }
-        self.cached_transactions.push(transaction.clone());
     }
 
-    pub fn transaction_was_cached(&self, transaction: &Transaction) -> bool {
+    pub fn is_transaction_cached(&self, transaction: &Transaction) -> bool {
         for tx in &self.cached_transactions {
             if tx.get_hash() == transaction.get_hash() {
                 return true;
@@ -33,11 +35,14 @@ impl Mempool {
         self.pending_transactions.remove(transaction_hash);
     }
 
+    /*
+     * Apply a vector of transactions into a temporal chainstate to make sure all of them are correct
+     */
     pub fn verify_veracity_of_incoming_transactions(
-        pending_transactions: &mut Vec<Transaction>,
+        transactions: &Vec<Transaction>,
         temporal_chainstate: &mut Chainstate,
     ) -> bool {
-        for tx in pending_transactions {
+        for tx in transactions {
             if tx.verify()
                 && temporal_chainstate.verify_transaction_ammount(tx)
                 && temporal_chainstate.verify_transaction_history(tx)
@@ -50,8 +55,11 @@ impl Mempool {
         true
     }
 
+    /*
+     * Apply a vector of transactions (up to 500) into a temporal chainstate and separeate the correct ones from the bad
+     */
     pub fn verify_veracity_of_transactions(
-        pending_transactions: &mut Vec<Transaction>,
+        pending_transactions: &Vec<Transaction>,
         temporal_chainstate: &mut Chainstate,
     ) -> (Vec<Transaction>, Vec<Transaction>) {
         let mut ok_txs = Vec::new();

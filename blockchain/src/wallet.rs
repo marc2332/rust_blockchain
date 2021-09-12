@@ -22,6 +22,16 @@ pub struct Wallet {
     pub history: u64,
 }
 
+impl std::fmt::Debug for Wallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let key = Key(self.keypair.public_key_to_pem().unwrap());
+        f.debug_struct("Wallet")
+            .field("keypair", &key.hash_it())
+            .field("history", &self.history)
+            .finish()
+    }
+}
+
 impl SignVerifier for Wallet {
     fn verify_signature(&self, signature: &Key, data: String) -> bool {
         let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
