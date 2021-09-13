@@ -17,7 +17,12 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn new() -> Self {
-        let db = sled::open("db").unwrap();
+        let db = sled::Config::new()
+            .path("db")
+            .mode(sled::Mode::HighThroughput)
+            .flush_every_ms(Some(5000))
+            .open()
+            .unwrap();
         Self {
             id: 0,
             db,
@@ -38,7 +43,12 @@ impl Configuration {
         transaction_threads: u16,
         chain_memory_length: u16,
     ) -> Self {
-        let db = sled::open(db_name).unwrap();
+        let db = sled::Config::new()
+            .path(db_name)
+            .mode(sled::Mode::HighThroughput)
+            .flush_every_ms(Some(5000))
+            .open()
+            .unwrap();
         Self {
             id,
             db,
@@ -110,7 +120,6 @@ impl Configuration {
         );
 
         if result.is_ok() {
-            blocks.flush().unwrap();
             Ok(())
         } else {
             Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))

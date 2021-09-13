@@ -319,7 +319,7 @@ impl Node {
 }
 
 /*
- * Create a thread to recive transactions
+ * Create a thread to receive transactions
  */
 fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg> {
     let (tx, rx) = channel();

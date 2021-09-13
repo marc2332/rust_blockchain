@@ -39,7 +39,7 @@ impl Mempool {
      * Apply a vector of transactions into a temporal chainstate to make sure all of them are correct
      */
     pub fn verify_veracity_of_incoming_transactions(
-        transactions: &Vec<Transaction>,
+        transactions: &[Transaction],
         temporal_chainstate: &mut Chainstate,
     ) -> bool {
         for tx in transactions {
@@ -59,7 +59,7 @@ impl Mempool {
      * Apply a vector of transactions (up to 500) into a temporal chainstate and separeate the correct ones from the bad
      */
     pub fn verify_veracity_of_transactions(
-        pending_transactions: &Vec<Transaction>,
+        pending_transactions: &[Transaction],
         temporal_chainstate: &mut Chainstate,
     ) -> (Vec<Transaction>, Vec<Transaction>) {
         let mut ok_txs = Vec::new();
