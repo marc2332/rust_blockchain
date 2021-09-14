@@ -79,4 +79,12 @@ impl RPCClient {
         self.0
             .call_method("get_block_with_hash", "Option<Block>", (hash,))
     }
+
+    pub fn add_transactions(
+        &self,
+        transactions: Vec<Transaction>,
+    ) -> impl Future<Output = RpcResult<()>> {
+        self.0
+            .call_method("add_transactions", "()", (transactions,))
+    }
 }

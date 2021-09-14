@@ -8,6 +8,7 @@ use crate::Transaction;
 pub struct Mempool {
     pub pending_transactions: HashMap<String, Transaction>,
     pub cached_transactions: Vec<Transaction>,
+    pub chunked_transactions: Vec<Transaction>,
 }
 
 impl Mempool {

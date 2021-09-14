@@ -53,26 +53,36 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
 
-        // Propagate the transactions to known peers
-        let peers = state.peers.clone();
-        for (hostname, port) in peers.values() {
-            let transaction_senders = state.transaction_senders.clone();
+        if state.mempool.chunked_transactions.len() > 2 {
+            // Propagate the transactions chunk to known peers
+            let peers = state.peers.clone();
+            for (hostname, port) in peers.values() {
+                let transaction_senders = state.transaction_senders.clone();
+                let transactions = state.mempool.chunked_transactions.clone();
 
-            transaction_senders[state.available_tx_sender]
-                .send(ThreadMsg::PropagateTransaction {
-                    transaction: transaction.clone(),
-                    hostname: hostname.clone(),
-                    port: *port,
-                })
-                .unwrap();
-            state.available_tx_sender += 1;
-            if state.available_tx_sender == transaction_senders.len() {
-                state.available_tx_sender = 0;
+                transaction_senders[state.available_tx_sender]
+                    .send(ThreadMsg::PropagateTransactions {
+                        transactions,
+                        hostname: hostname.clone(),
+                        port: *port,
+                    })
+                    .unwrap();
+                state.available_tx_sender += 1;
+
+                if state.available_tx_sender == transaction_senders.len() {
+                    state.available_tx_sender = 0;
+                }
             }
+
+            state.mempool.chunked_transactions.clear();
+        } else {
+            // Save the transaction for the next chunk
+            state.mempool.chunked_transactions.push(transaction);
         }
 
-        // Minimum transactions per block are harcoded for now
         let mempool_len = state.mempool.pending_transactions.len();
+
+        // Minimum transactions per block are harcoded for now
         if mempool_len > 50 {
             let elected_forger = state.next_forger.as_ref().unwrap().hash_it();
 
@@ -154,7 +164,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             }
         }
         log::info!(
-            "(Node.{}) Verified transaction ({})",
+            "(Node.{}) Confirmed transaction ({})",
             state.id,
             state.mempool.pending_transactions.len()
         );

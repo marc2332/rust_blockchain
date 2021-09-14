@@ -31,15 +31,15 @@ fn create_configs() -> Vec<Configuration> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                2,
                 5,
+                2,
             )
         })
         .collect()
 }
 
 /*
- * The idea of this simulation is to run a few nodes that share the same blockchain and verify transactions
+ * The idea of this simulation is to run a few nodes that share the same blockchain, verify transactions and get rewarded
  */
 #[tokio::main]
 async fn main() {

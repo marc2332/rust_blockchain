@@ -79,6 +79,9 @@ pub trait RpcMethods {
 
     #[rpc(name = "get_block_with_hash")]
     fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>>;
+
+    #[rpc(name = "add_transactions")]
+    fn add_transactions(&self, transactions: Vec<Transaction>) -> Result<()>;
 }
 
 struct RpcManager {
@@ -130,6 +133,22 @@ impl RpcMethods for RpcManager {
     fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>> {
         get_block_with_hash(&self.state, hash)
     }
+
+    fn add_transactions(&self, transactions: Vec<Transaction>) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+
+        for tx in transactions {
+            state.transaction_handlers[state.available_tx_handler]
+                .send(ThreadMsg::AddTransaction(tx))
+                .unwrap();
+            state.available_tx_handler += 1;
+            if state.available_tx_handler == state.transaction_handlers.len() {
+                state.available_tx_handler = 0;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -158,8 +177,8 @@ impl NodeState {
 
 pub enum ThreadMsg {
     AddTransaction(Transaction),
-    PropagateTransaction {
-        transaction: Transaction,
+    PropagateTransactions {
+        transactions: Vec<Transaction>,
         hostname: String,
         port: u16,
     },
@@ -234,11 +253,11 @@ impl Node {
             peers.remove(&address);
         }
 
-        if peers.len() > 4 {
+        if peers.len() > 10 {
             let nodes_peers = peers.clone();
             let addresses = Vec::from_iter(nodes_peers.iter());
             for (address, _) in addresses.iter() {
-                if peers.len() > 4 {
+                if peers.len() > 10 {
                     peers.remove(&address.to_string());
                 }
             }
@@ -248,7 +267,11 @@ impl Node {
     }
 
     pub async fn run(&mut self) {
-        log::info!("(Node.{}) Booting up node...", self.config.id);
+        log::info!(
+            "(Node.{}) Booting up node... {:?}",
+            self.config.id,
+            self.state.lock().unwrap().peers
+        );
 
         // Setup the transactions handlers threads
         let transaction_handlers = (0..self.config.transaction_threads)
@@ -352,20 +375,20 @@ fn create_transaction_sender() -> Sender<ThreadMsg> {
         rt.block_on(async {
             loop {
                 let rx = rx.lock().unwrap();
-                if let ThreadMsg::PropagateTransaction {
-                    transaction,
+                if let ThreadMsg::PropagateTransactions {
+                    transactions,
                     hostname,
                     port,
                 } = rx.recv().unwrap()
                 {
                     let hostname = hostname.clone();
                     let port = port;
-                    let transaction = transaction.clone();
+                    let transactions = transactions.clone();
 
                     let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
                         .await
                         .unwrap();
-                    client.add_transaction(transaction).await.ok();
+                    client.add_transactions(transactions).await.ok();
                 }
             }
         })
