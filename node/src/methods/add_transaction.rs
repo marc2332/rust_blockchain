@@ -9,16 +9,26 @@ use blockchain::{
     TransactionBuilder,
     TransactionType,
 };
-use chrono::Utc;
+use chrono::{
+    DateTime,
+    Utc,
+};
 use jsonrpc_http_server::jsonrpc_core::*;
 use serde::{
     Deserialize,
     Serialize,
 };
-use std::sync::{
-    Arc,
-    Mutex,
+use std::{
+    str::FromStr,
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
+
+static BLOCK_TIME_MAX: i64 = 2500;
+static MINIMUM_MEMPOOL_SIZE: usize = 2;
+static TRANSACTIONS_CHUNK_SIZE: usize = 2;
 
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
@@ -53,7 +63,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
 
-        if state.mempool.chunked_transactions.len() > 2 {
+        if state.mempool.chunked_transactions.len() > TRANSACTIONS_CHUNK_SIZE {
             // Propagate the transactions chunk to known peers
             let peers = state.peers.clone();
             for (hostname, port) in peers.values() {
@@ -83,7 +93,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         let mempool_len = state.mempool.pending_transactions.len();
 
         // Minimum transactions per block are harcoded for now
-        if mempool_len > 50 {
+        if mempool_len > MINIMUM_MEMPOOL_SIZE {
             let elected_forger = state.next_forger.as_ref().unwrap().hash_it();
 
             if elected_forger == state.wallet.get_public().hash_it() {
@@ -161,8 +171,52 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                         state.available_block_sender = 0;
                     }
                 }
+            } else {
+                // Punish the current block forger if he missed his time to create a block
+                if let Some(current_forger) = state.next_forger.clone() {
+                    /*
+                     * Make sure he is not punished already (this shouldn't be the case anyway)
+                     * And just to prevent initial issues, make sure the current chain height is greater than 5
+                     */
+                    if !state
+                        .blockchain
+                        .state
+                        .is_punished(&current_forger.hash_it())
+                        && state.blockchain.index > 5
+                    {
+                        let last_block = state.blockchain.chain.last().unwrap();
+                        let last_block_time: DateTime<Utc> =
+                            DateTime::from_str(&last_block.timestamp).unwrap();
+
+                        let current_time = Utc::now();
+
+                        let time_diff = current_time.signed_duration_since(last_block_time);
+
+                        // Punish the forger if he missed for 2 seconds
+                        if time_diff.num_milliseconds() > BLOCK_TIME_MAX {
+                            // Block creation timeout
+                            let block_index = state.blockchain.index;
+                            state
+                                .blockchain
+                                .state
+                                .missed_forgers
+                                .insert(current_forger.hash_it(), block_index);
+                            log::warn!("Blocked forger = {}", current_forger.hash_it());
+                        }
+                    }
+                }
+
+                // Forgive older forgers that missed it's block
+
+                for (forger, block_index) in state.blockchain.state.missed_forgers.clone() {
+                    if block_index + 1 < state.blockchain.index {
+                        log::warn!("Unblocked forger = {}", forger);
+                        state.blockchain.state.missed_forgers.remove(&forger);
+                    }
+                }
             }
         }
+
         log::info!(
             "(Node.{}) Confirmed transaction ({})",
             state.id,

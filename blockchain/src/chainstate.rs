@@ -24,6 +24,7 @@ pub struct Chainstate {
     pub addresses: HashMap<String, AddressInfo>,
     pub last_staking_addresses: Vec<Transaction>,
     pub last_forgers: Vec<String>,
+    pub missed_forgers: HashMap<String, usize>,
 }
 
 impl Chainstate {
@@ -33,7 +34,12 @@ impl Chainstate {
             addresses: HashMap::new(),
             last_staking_addresses: Vec::new(),
             last_forgers: Vec::new(),
+            missed_forgers: HashMap::new(),
         }
+    }
+
+    pub fn is_punished(&self, address: &str) -> bool {
+        self.missed_forgers.contains_key(address)
     }
 
     pub fn has_forger(&self, address: &str) -> bool {

@@ -857,7 +857,9 @@ name = "consensus"
 version = "0.1.0"
 dependencies = [
  "blockchain",
+ "chrono",
  "futures 0.3.16",
+ "log 0.4.14",
  "rust-crypto",
  "serde_json",
  "tokio 1.10.0",

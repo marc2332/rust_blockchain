@@ -30,6 +30,7 @@ pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors>
             } = tx
             {
                 if !blockchain.state.has_forger(from_address)
+                    && !blockchain.state.is_punished(from_address)
                     && hash.contains(&last_block.hash.hash[0..len])
                 {
                     if blockchain.state.last_forgers.len() >= stakings.len() - 2 {

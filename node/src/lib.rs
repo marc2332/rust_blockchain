@@ -267,11 +267,7 @@ impl Node {
     }
 
     pub async fn run(&mut self) {
-        log::info!(
-            "(Node.{}) Booting up node... {:?}",
-            self.config.id,
-            self.state.lock().unwrap().peers
-        );
+        log::info!("(Node.{}) Booting up node...", self.config.id);
 
         // Setup the transactions handlers threads
         let transaction_handlers = (0..self.config.transaction_threads)
