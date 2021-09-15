@@ -26,7 +26,7 @@ use std::{
     },
 };
 
-static BLOCK_TIME_MAX: i64 = 2500;
+static BLOCK_TIME_MAX: i64 = 5000;
 static MINIMUM_MEMPOOL_SIZE: usize = 2;
 static TRANSACTIONS_CHUNK_SIZE: usize = 2;
 
@@ -95,7 +95,6 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Minimum transactions per block are harcoded for now
         if mempool_len > MINIMUM_MEMPOOL_SIZE {
             let elected_forger = state.next_forger.as_ref().unwrap().hash_it();
-
             if elected_forger == state.wallet.get_public().hash_it() {
                 // Transform the pending transactions from a hashmap into a vector
                 let mut pending_transactions = state
@@ -140,7 +139,6 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                 // Add the block to the blockchain
                 state.blockchain.add_block(&new_block).unwrap();
 
-                // Elect the next forger
                 state.elect_new_forger();
 
                 ok_txs.append(&mut bad_txs);
@@ -171,19 +169,26 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                         state.available_block_sender = 0;
                     }
                 }
-            } else {
-                // Punish the current block forger if he missed his time to create a block
-                if let Some(current_forger) = state.next_forger.clone() {
+            }
+
+            // Punish the current block forger if he missed his time to create a block
+            if let Some(current_forger) = state.next_forger.clone() {
+                /*
+                 * Make sure he is not punished already (this shouldn't be the case anyway)
+                 * And just to prevent initial issues, make sure the current chain height is greater than 5
+                 */
+                if !state
+                    .blockchain
+                    .state
+                    .is_punished(&current_forger.hash_it())
+                    && state.blockchain.index > 25
+                {
+                    let previous_forgers_are_blocked = !state.blockchain.state.missed_forgers.is_empty();
+
                     /*
-                     * Make sure he is not punished already (this shouldn't be the case anyway)
-                     * And just to prevent initial issues, make sure the current chain height is greater than 5
+                     * It wouldn't be fair if to diff the time between last block and now because there has been a blocked forger in between.
                      */
-                    if !state
-                        .blockchain
-                        .state
-                        .is_punished(&current_forger.hash_it())
-                        && state.blockchain.index > 5
-                    {
+                    if !previous_forgers_are_blocked {
                         let last_block = state.blockchain.chain.last().unwrap();
                         let last_block_time: DateTime<Utc> =
                             DateTime::from_str(&last_block.timestamp).unwrap();
@@ -201,18 +206,20 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                                 .state
                                 .missed_forgers
                                 .insert(current_forger.hash_it(), block_index);
+
+                            state.elect_new_forger();
+
                             log::warn!("Blocked forger = {}", current_forger.hash_it());
                         }
                     }
                 }
+            }
 
-                // Forgive older forgers that missed it's block
-
-                for (forger, block_index) in state.blockchain.state.missed_forgers.clone() {
-                    if block_index + 1 < state.blockchain.index {
-                        log::warn!("Unblocked forger = {}", forger);
-                        state.blockchain.state.missed_forgers.remove(&forger);
-                    }
+            // Forgive older forgers that missed it's block
+            for (forger, block_index) in state.blockchain.state.missed_forgers.clone() {
+                if block_index  < state.blockchain.index {
+                    log::warn!("Unblocked forger = {}", forger);
+                    state.blockchain.state.missed_forgers.remove(&forger);
                 }
             }
         }
