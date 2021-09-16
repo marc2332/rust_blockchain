@@ -25,8 +25,6 @@ use jsonrpc_core::{
     Result,
 };
 use jsonrpc_derive::rpc;
-use std::iter::FromIterator;
-
 pub mod mempool;
 pub mod methods;
 
@@ -253,16 +251,6 @@ impl Node {
             peers.remove(&address);
         }
 
-        if peers.len() > 10 {
-            let nodes_peers = peers.clone();
-            let addresses = Vec::from_iter(nodes_peers.iter());
-            for (address, _) in addresses.iter() {
-                if peers.len() > 10 {
-                    peers.remove(&address.to_string());
-                }
-            }
-        }
-
         self.state.lock().unwrap().peers = peers;
     }
 
@@ -277,14 +265,14 @@ impl Node {
         self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
         // Setup the transactions sender threads
-        let transaction_senders = (0..1)
+        let transaction_senders = (0..2)
             .map(|_| create_transaction_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
         self.state.lock().unwrap().transaction_senders = transaction_senders;
 
         // Setup the blocks sender threads
-        let block_senders = (0..1)
+        let block_senders = (0..2)
             .map(|_| create_block_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 

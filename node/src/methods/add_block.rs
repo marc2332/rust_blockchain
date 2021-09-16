@@ -38,13 +38,13 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             .add_block(&block.clone())
             .is_ok()
         {
+            let mut state = state.lock().unwrap();
             // Elect the next forger
-            state.lock().unwrap().elect_new_forger();
+            state.elect_new_forger();
 
             let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
 
-            // Remove thee bundled transactions from the mempool
-            let mut state = state.lock().unwrap();
+            // Remove the block transactions from the mempool
             for tx in block_txs {
                 state.mempool.remove_transaction(&tx.get_hash())
             }
@@ -69,9 +69,9 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                     .await
                     .unwrap();
 
-                let res = client.get_block_with_prev_hash(prev_hash.clone()).await;
+                let remote_block = client.get_block_with_prev_hash(prev_hash.clone()).await;
 
-                if let Ok(Some(block)) = res {
+                if let Ok(Some(block)) = remote_block {
                     state
                         .lock()
                         .unwrap()
@@ -81,29 +81,32 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 }
             }
 
-            let mut state = state.lock().unwrap();
-            state.lost_blocks.insert(block.hash.unite(), block);
+            state
+                .lock()
+                .unwrap()
+                .lost_blocks
+                .insert(block.hash.unite(), block);
         }
 
         let mut state = state.lock().unwrap();
 
         /*
-        * Blockchain regeneration
-        + This tries to append previously lost blocks (probably due to latency) into the chain
-        */
+         * Blockchain regeneration
+         * This tries to append previously lost blocks (probably due to latency) into the chain
+         */
         if !state.lost_blocks.is_empty() {
             let mut blocks_iter = state.lost_blocks.clone().into_iter().peekable();
             let mut blocks = state.lost_blocks.clone();
+            let mut any_recovered_block = false;
 
             while blocks_iter.peek().is_some() {
                 let (_, block) = blocks_iter.next().unwrap();
-                let res = state.blockchain.add_block(&block.clone()).is_ok();
-                if res {
+                let is_block_ok = state.blockchain.add_block(&block.clone()).is_ok();
+                if is_block_ok {
                     blocks.remove(&block.hash.unite());
                     blocks_iter = blocks.clone().into_iter().peekable();
 
-                    // Elect next block forger
-                    state.elect_new_forger();
+                    any_recovered_block = true;
 
                     // Remove confirmed transactions from the mempool
                     let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
@@ -114,7 +117,11 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 }
             }
 
-            state.lost_blocks = blocks;
+            // If any block has been recovered then elect a new forger
+            if any_recovered_block {
+                state.elect_new_forger();
+                state.lost_blocks = blocks;
+            }
 
             log::warn!(
                 "(Node.{}) Length of lost blocks is <{}>",

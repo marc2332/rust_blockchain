@@ -26,9 +26,9 @@ use std::{
     },
 };
 
-static BLOCK_TIME_MAX: i64 = 3000;
-static MINIMUM_MEMPOOL_SIZE: usize = 2;
-static TRANSACTIONS_CHUNK_SIZE: usize = 2;
+static BLOCK_TIME_MAX: i64 = 8000;
+static MINIMUM_MEMPOOL_SIZE: usize = 50;
+static TRANSACTIONS_CHUNK_SIZE: usize = 3;
 
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
@@ -181,13 +181,13 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .blockchain
                     .state
                     .is_punished(&current_forger.hash_it())
-                    && state.blockchain.index > 10
+                    && state.blockchain.index > 5
                 {
                     let previous_forgers_are_blocked =
                         !state.blockchain.state.missed_forgers.is_empty();
 
                     /*
-                     * It wouldn't be fair if to diff the time between last block and now because there has been a blocked forger in between.
+                     * It wouldn't be fair to diff the time between last block and now because there has been a blocked forger in between.
                      */
                     if !previous_forgers_are_blocked {
                         let last_block = state.blockchain.chain.last().unwrap();

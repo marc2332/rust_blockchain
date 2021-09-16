@@ -50,6 +50,6 @@ pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors>
             break;
         }
     }
-    println!("{}", forger.unwrap().hash_it());
+
     Ok(forger.unwrap().clone())
 }

@@ -131,8 +131,9 @@ impl Blockchain {
                 }
 
                 log::info!(
-                    "(Node.{}) Added block -> {:?} (size of {})",
+                    "(Node.{}) Added block [{}] -> {:?} (size of {})",
                     self.config.lock().unwrap().id,
+                    self.index,
                     block.hash.unite(),
                     transactions.len()
                 );
