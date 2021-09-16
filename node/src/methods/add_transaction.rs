@@ -26,7 +26,7 @@ use std::{
     },
 };
 
-static BLOCK_TIME_MAX: i64 = 5000;
+static BLOCK_TIME_MAX: i64 = 3000;
 static MINIMUM_MEMPOOL_SIZE: usize = 2;
 static TRANSACTIONS_CHUNK_SIZE: usize = 2;
 
@@ -181,9 +181,10 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .blockchain
                     .state
                     .is_punished(&current_forger.hash_it())
-                    && state.blockchain.index > 25
+                    && state.blockchain.index > 10
                 {
-                    let previous_forgers_are_blocked = !state.blockchain.state.missed_forgers.is_empty();
+                    let previous_forgers_are_blocked =
+                        !state.blockchain.state.missed_forgers.is_empty();
 
                     /*
                      * It wouldn't be fair if to diff the time between last block and now because there has been a blocked forger in between.
@@ -217,7 +218,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
             // Forgive older forgers that missed it's block
             for (forger, block_index) in state.blockchain.state.missed_forgers.clone() {
-                if block_index  < state.blockchain.index {
+                if block_index < state.blockchain.index {
                     log::warn!("Unblocked forger = {}", forger);
                     state.blockchain.state.missed_forgers.remove(&forger);
                 }

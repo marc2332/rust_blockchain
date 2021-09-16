@@ -83,9 +83,15 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
 
             let mut state = state.lock().unwrap();
             state.lost_blocks.insert(block.hash.unite(), block);
+        }
 
-            // Incredibly awful, should be improved
+        let mut state = state.lock().unwrap();
 
+        /*
+        * Blockchain regeneration
+        + This tries to append previously lost blocks (probably due to latency) into the chain
+        */
+        if !state.lost_blocks.is_empty() {
             let mut blocks_iter = state.lost_blocks.clone().into_iter().peekable();
             let mut blocks = state.lost_blocks.clone();
 
