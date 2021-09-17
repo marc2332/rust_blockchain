@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Network Simulation",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=simulation",
+                    "--package=node"
+                ],
+                "filter": {
+                    "name": "simulation",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}
