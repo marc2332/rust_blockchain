@@ -212,8 +212,8 @@ impl Chainstate {
 
                         self.last_staking_addresses.push(tx.clone());
 
-                        if self.last_staking_addresses.len() > 100 {
-                            self.last_staking_addresses.pop();
+                        if self.last_staking_addresses.len() >= 100 {
+                            self.last_staking_addresses.remove(0);
                         }
                     }
                 }

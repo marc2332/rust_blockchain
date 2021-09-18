@@ -61,6 +61,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 .unwrap()
                 .unite();
 
+            // Ask known peers for the missing block
             for (hostname, port) in peers.values() {
                 let hostname = hostname.clone();
                 let port = *port;
@@ -81,6 +82,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 }
             }
 
+            // Added the new block to the lost queue
             state
                 .lock()
                 .unwrap()

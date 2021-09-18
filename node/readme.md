@@ -10,5 +10,6 @@
 - [ ] Fees ?
 - [x] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
 - [x] Scalable block size relative to the network performance
-- [ ] Always have just the X last blocks of the blockchain on memory to avoid infinite memory increase
+- [x] Always have just the X last blocks of the blockchain on memory to avoid infinite memory increase
 - [ ] Implement a consensus algorithm to prevent bad nodes to ignore certain transactions
+- [ ] Improve simulation by allowing external nodes to join (this would need to have synchronization support)

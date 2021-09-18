@@ -228,8 +228,8 @@ fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {
             // The previous hash must be the same as the previous block's hash
             if previous_hash.unite() != previous_block.hash.unite() {
                 return Err(BlockchainErrors::InvalidPrevioushHash(
-                    previous_hash.hash.clone(),
-                    previous_block.hash.hash.clone(),
+                    previous_hash.hash.to_string(),
+                    previous_block.hash.hash.to_string(),
                 ));
             }
 

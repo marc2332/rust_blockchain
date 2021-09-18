@@ -67,7 +67,7 @@ impl Mempool {
         let mut bad_txs = Vec::new();
 
         for tx in pending_transactions {
-            if ok_txs.len() > 500 {
+            if ok_txs.len() > 700 {
                 break;
             }
 

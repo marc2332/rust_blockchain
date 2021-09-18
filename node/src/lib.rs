@@ -339,7 +339,9 @@ fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg>
                 let rx = rx.lock().unwrap();
                 let state = state.clone();
                 if let ThreadMsg::AddTransaction(transaction) = rx.recv().unwrap() {
-                    add_transaction(&state, transaction).await
+                    tokio::spawn(async move {
+                        add_transaction(&state, transaction).await;
+                    });
                 }
             }
         })

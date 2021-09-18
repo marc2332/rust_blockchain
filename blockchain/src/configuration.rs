@@ -20,7 +20,6 @@ impl Configuration {
         let db = sled::Config::new()
             .path("db")
             .mode(sled::Mode::HighThroughput)
-            .flush_every_ms(Some(5000))
             .open()
             .unwrap();
         Self {
@@ -29,8 +28,8 @@ impl Configuration {
             rpc_port: 2000,
             hostname: "0.0.0.0".to_string(),
             wallet: Wallet::default(),
-            transaction_threads: 5,
-            chain_memory_length: 300,
+            transaction_threads: 2,
+            chain_memory_length: 20,
         }
     }
 
@@ -46,7 +45,6 @@ impl Configuration {
         let db = sled::Config::new()
             .path(db_name)
             .mode(sled::Mode::HighThroughput)
-            .flush_every_ms(Some(5000))
             .open()
             .unwrap();
         Self {
@@ -122,7 +120,9 @@ impl Configuration {
         if result.is_ok() {
             Ok(())
         } else {
-            Err(BlockchainErrors::CouldntAddBlock(block.hash.hash.clone()))
+            Err(BlockchainErrors::CouldntAddBlock(
+                block.hash.hash.to_string(),
+            ))
         }
     }
 }

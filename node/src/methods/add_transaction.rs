@@ -28,7 +28,7 @@ use std::{
 
 static BLOCK_TIME_MAX: i64 = 8000;
 static MINIMUM_MEMPOOL_SIZE: usize = 50;
-static TRANSACTIONS_CHUNK_SIZE: usize = 3;
+static TRANSACTIONS_CHUNK_SIZE: usize = 2;
 
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
@@ -63,11 +63,15 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Add the transaction to the memory pool
         state.mempool.add_transaction(&transaction);
 
+        // Save the transaction for the next chunk
+        state.mempool.chunked_transactions.push(transaction);
+
+        // Propagate transactions as chunks
         if state.mempool.chunked_transactions.len() > TRANSACTIONS_CHUNK_SIZE {
             // Propagate the transactions chunk to known peers
             let peers = state.peers.clone();
+            let transaction_senders = state.transaction_senders.clone();
             for (hostname, port) in peers.values() {
-                let transaction_senders = state.transaction_senders.clone();
                 let transactions = state.mempool.chunked_transactions.clone();
 
                 transaction_senders[state.available_tx_sender]
@@ -85,9 +89,6 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             }
 
             state.mempool.chunked_transactions.clear();
-        } else {
-            // Save the transaction for the next chunk
-            state.mempool.chunked_transactions.push(transaction);
         }
 
         let mempool_len = state.mempool.pending_transactions.len();
@@ -95,6 +96,8 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Minimum transactions per block are harcoded for now
         if mempool_len > MINIMUM_MEMPOOL_SIZE {
             let elected_forger = state.next_forger.as_ref().unwrap().hash_it();
+
+            // Only the elected forger can create new blocks
             if elected_forger == state.wallet.get_public().hash_it() {
                 // Transform the pending transactions from a hashmap into a vector
                 let mut pending_transactions = state
@@ -198,7 +201,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
 
                         let time_diff = current_time.signed_duration_since(last_block_time);
 
-                        // Punish the forger if he missed for 2 seconds
+                        // Punish the forger if he missed for configured time
                         if time_diff.num_milliseconds() > BLOCK_TIME_MAX {
                             // Block creation timeout
                             let block_index = state.blockchain.index;

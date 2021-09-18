@@ -2,14 +2,15 @@ This projects intends to make possible to have distributed blockchain in which b
 
 WIP.
 
-| crate            | description                                                                                 |
-|------------------|---------------------------------------------------------------------------------------------|
-| blockchain       | Different utilities to build a blockchain, blocks, hashing, public-private keys, signing... |
-| node             | Node client that runs a JSON-RPC server and has a blockchain (WIP)                          |
-| client           | JSON-RPC Client to connect and interact with a node                                         |
-| consensus        | Consensus utilities                                                                         |
-| discovery_server | A signaling server for nodes to find each other                                             |
-| cli              | CLI Runner of a Node                                                                        |
+| crate            | description                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------|
+| blockchain       | Different utilities to build a blockchain, blocks, hashing, public-private keys, signing...          |
+| node             | Node client that runs a JSON-RPC server and has a blockchain (WIP)                                   |
+| client           | JSON-RPC Client to connect and interact with a node                                                  |
+| consensus        | Consensus utilities                                                                                  |
+| discovery_server | A signaling server for nodes to find each other                                                      |
+| cli              | CLI Runner of a Node                                                                                 |
+| explorer         | A TUI app to display the evolution of the blockchain and monetary increase of the simulation nodes   |
 
 ## Requirements
 - Cargo (nightly toolchain)
