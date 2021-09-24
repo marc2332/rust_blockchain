@@ -367,14 +367,12 @@ fn create_transaction_sender() -> Sender<ThreadMsg> {
                     port,
                 } = rx.recv().unwrap()
                 {
-                    let hostname = hostname.clone();
-                    let port = port;
-                    let transactions = transactions.clone();
-
-                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                        .await
-                        .unwrap();
-                    client.add_transactions(transactions).await.ok();
+                    tokio::spawn(async move {
+                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                            .await
+                            .unwrap();
+                        client.add_transactions(transactions).await.ok();
+                    });
                 }
             }
         })

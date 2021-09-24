@@ -18,7 +18,7 @@ impl Mempool {
 
         self.cached_transactions.push(transaction.clone());
 
-        if self.cached_transactions.len() >= 1000 {
+        if self.cached_transactions.len() >= 300 {
             self.cached_transactions.remove(0);
         }
     }

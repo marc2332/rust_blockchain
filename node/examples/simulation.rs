@@ -31,7 +31,7 @@ fn create_configs() -> Vec<Configuration> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                3,
+                5,
                 2,
             )
         })
@@ -93,7 +93,7 @@ async fn main() {
     let mut senders_threads = Vec::new();
 
     for _ in 0..2 {
-        for i in 0..7 {
+        for i in 0..5 {
             let (tx, sender) = create_sender(&mut genesis_wallet, i);
             transactions.push(tx);
             senders_threads.push(sender);
@@ -164,7 +164,7 @@ fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Futu
             // Build the transaction
             let sample_tx = TransactionBuilder::new()
                 .to_address(&temp_wallet.get_public().hash_it())
-                .ammount(100)
+                .ammount(1)
                 .is_type(TransactionType::MOVEMENT)
                 .with_wallet(&mut sender_wallet)
                 .build();
