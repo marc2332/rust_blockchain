@@ -64,8 +64,8 @@ impl Chainstate {
     /*
      * Calculate the chainstate from the begining of the blockchain
      */
-    pub fn load_from_chain(&mut self, name: &str) {
-        let chain = self.config.lock().unwrap().get_blocks(name).unwrap();
+    pub fn load_from_chain(&mut self) {
+        let chain = self.config.lock().unwrap().get_blocks().unwrap();
 
         for block in chain.iter() {
             let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();

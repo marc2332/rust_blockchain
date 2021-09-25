@@ -195,7 +195,7 @@ pub struct Node {
 
 impl Node {
     pub fn new(config: Configuration) -> Self {
-        let blockchain = Blockchain::new("mars", config.clone());
+        let blockchain = Blockchain::new(config.clone());
 
         let wallet = config.wallet.clone();
         let id = config.id;
@@ -367,12 +367,10 @@ fn create_transaction_sender() -> Sender<ThreadMsg> {
                     port,
                 } = rx.recv().unwrap()
                 {
-                    tokio::spawn(async move {
-                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                            .await
-                            .unwrap();
-                        client.add_transactions(transactions).await.ok();
-                    });
+                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                        .await
+                        .unwrap();
+                    client.add_transactions(transactions).await.ok();
                 }
             }
         })

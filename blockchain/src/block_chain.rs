@@ -14,7 +14,6 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Blockchain {
-    pub name: String,
     pub chain: Vec<Block>,
     pub index: usize,
     pub last_block_hash: Option<BlockHash>,
@@ -35,8 +34,8 @@ pub enum BlockchainErrors {
 }
 
 impl Blockchain {
-    pub fn new(name: &str, config: Configuration) -> Self {
-        let mut chain = config.get_blocks(name).unwrap();
+    pub fn new(config: Configuration) -> Self {
+        let mut chain = config.get_blocks().unwrap();
 
         log::info!("(Node.{}) Loaded blockchain from database", config.id);
 
@@ -55,7 +54,7 @@ impl Blockchain {
 
         let mut state = Chainstate::new(config.clone());
 
-        state.load_from_chain(name);
+        state.load_from_chain();
 
         let chain_memory_length = config.lock().unwrap().chain_memory_length;
 
@@ -67,7 +66,6 @@ impl Blockchain {
         }
 
         Self {
-            name: name.to_string(),
             chain,
             index,
             last_block_hash,
@@ -111,7 +109,7 @@ impl Blockchain {
 
         if block_can_be_added {
             // Add the block to the database
-            let db_result = self.config.lock().unwrap().add_block(&block, &self.name);
+            let db_result = self.config.lock().unwrap().add_block(&block);
 
             if db_result.is_ok() {
                 // Update chainstate with the new transactions

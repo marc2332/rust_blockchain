@@ -31,8 +31,9 @@ fn create_configs() -> Vec<Configuration> {
                 2000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                5,
                 2,
+                2,
+                "mars",
             )
         })
         .collect()

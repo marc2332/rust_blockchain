@@ -9,7 +9,7 @@ use chrono::Utc;
 
 #[test]
 fn test() {
-    let mut blockchain = Blockchain::new("mars", Configuration::new());
+    let mut blockchain = Blockchain::new(Configuration::new());
 
     assert!(blockchain.verify_integrity().is_ok());
 

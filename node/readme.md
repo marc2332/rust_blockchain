@@ -13,4 +13,4 @@
 - [x] Always have just the X last blocks of the blockchain on memory to avoid infinite memory increase
 - [ ] Implement a consensus algorithm to prevent bad nodes to ignore certain transactions
 - [ ] Improve simulation by allowing external nodes to join (this would need to have synchronization support)
-- [ ] Fix the never-ending memory usage increase: move DB operations to a different thread to prevent having transactions handlers to wait until DB the operation is done
+- [ ] Fix the never-ending memory usage increase
