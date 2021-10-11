@@ -72,9 +72,6 @@ struct Cli {
     /// time in ms between two ticks.
     #[argh(option, default = "250")]
     tick_rate: u64,
-    /// whether unicode symbols are used to improve the overall look of the app
-    #[argh(option, default = "true")]
-    enhanced_graphics: bool,
 }
 
 struct TabsState {

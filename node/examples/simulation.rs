@@ -14,10 +14,6 @@ use client::RPCClient;
 use futures::Future;
 use jsonrpc_core::serde_json;
 use log::LevelFilter;
-use mongodb::{
-    options::ClientOptions,
-    Client,
-};
 use node::Node;
 use simple_logger::SimpleLogger;
 use std::{
@@ -30,7 +26,6 @@ fn create_configs() -> Vec<Configuration> {
         .map(|i| {
             Configuration::from_params(
                 i,
-                &format!("db_{}", i),
                 5000 + i,
                 "127.0.0.1",
                 Wallet::default(),
@@ -130,15 +125,12 @@ async fn main() {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 node.sync_from_discovery_server().await;
-                let mut state = node.state.lock().unwrap();
 
                 // Create a genesis block if there isn't
-                if state.blockchain.last_block_hash.is_none() {
-                    state.blockchain.add_block(&genesis_block).unwrap();
-                    state.elect_new_forger();
+                if node.state.lock().unwrap().blockchain.last_block_hash.is_none() {
+                    node.state.lock().unwrap().blockchain.add_block(&genesis_block).unwrap();
+                    node.state.lock().unwrap().elect_new_forger();
                 }
-
-                drop(state);
 
                 node.run().await;
             })

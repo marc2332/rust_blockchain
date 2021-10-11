@@ -1,18 +1,7 @@
-use std::sync::{
-    mpsc,
-    Arc,
-    Mutex,
-};
-
 use crate::{
     Block,
     BlockchainErrors,
-    Transaction,
     Wallet,
-};
-use std::{
-    sync::mpsc::Sender,
-    thread,
 };
 
 use futures_util::stream::StreamExt;
@@ -60,7 +49,6 @@ impl Configuration {
 
     pub fn from_params(
         id: u16,
-        db_name: &str,
         rpc_port: u16,
         hostname: &str,
         wallet: Wallet,
