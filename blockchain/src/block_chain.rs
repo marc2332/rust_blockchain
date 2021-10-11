@@ -34,8 +34,8 @@ pub enum BlockchainErrors {
 }
 
 impl Blockchain {
-    pub fn new(config: Configuration) -> Self {
-        let mut chain = config.get_blocks().unwrap();
+    pub async fn new(config: Configuration) -> Self {
+        let mut chain = config.get_blocks().await.unwrap();
 
         log::info!("(Node.{}) Loaded blockchain from database", config.id);
 
@@ -54,7 +54,7 @@ impl Blockchain {
 
         let mut state = Chainstate::new(config.clone());
 
-        state.load_from_chain();
+        state.load_from_chain().await;
 
         let chain_memory_length = config.lock().unwrap().chain_memory_length;
 
@@ -109,7 +109,10 @@ impl Blockchain {
 
         if block_can_be_added {
             // Add the block to the database
-            let db_result = self.config.lock().unwrap().add_block(&block);
+            let db_result: Result<(), ()> = {
+                self.config.lock().unwrap().add_block(&block);
+                Ok(())
+            };
 
             if db_result.is_ok() {
                 // Update chainstate with the new transactions

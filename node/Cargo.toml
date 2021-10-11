@@ -25,3 +25,4 @@ tokio = { version = "1.11.0", features = ["rt-multi-thread", "macros"]}
 actix-rt = "2.2.0"
 simple_logger = "1.13.0"
 discovery_server = { path = "../discovery_server" }
+mongodb = "2.0.0"

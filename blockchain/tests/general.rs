@@ -6,62 +6,63 @@ use blockchain::{
     Wallet,
 };
 use chrono::Utc;
+use futures_util::FutureExt;
 
 #[test]
 fn test() {
-    let mut blockchain = Blockchain::new(Configuration::new());
+    Blockchain::new(Configuration::new()).then(|blockchain| {
+        assert!(blockchain.verify_integrity().is_ok());
 
-    assert!(blockchain.verify_integrity().is_ok());
+        let account_a = Wallet::new();
+        let public_key = account_a.get_public();
 
-    let account_a = Wallet::new();
-    let public_key = account_a.get_public();
+        if blockchain.last_block_hash.is_none() {
+            blockchain
+                .add_block(
+                    &BlockBuilder::new()
+                        .payload("block 1")
+                        .timestamp(Utc::now())
+                        .key(&public_key)
+                        .hash_it()
+                        .sign_with(&account_a)
+                        .build(),
+                )
+                .unwrap();
+        }
 
-    if blockchain.last_block_hash.is_none() {
-        blockchain
-            .add_block(
-                &BlockBuilder::new()
-                    .payload("block 1")
-                    .timestamp(Utc::now())
-                    .key(&public_key)
-                    .hash_it()
-                    .sign_with(&account_a)
-                    .build(),
-            )
-            .unwrap();
-    }
+        for i in 1..5 {
+            blockchain
+                .add_block(
+                    &BlockBuilder::new()
+                        .payload(&format!("Block {:?}", i))
+                        .timestamp(Utc::now())
+                        .previous_hash(&blockchain.last_block_hash.clone().unwrap())
+                        .key(&public_key)
+                        .hash_it()
+                        .sign_with(&account_a)
+                        .build(),
+                )
+                .unwrap();
+        }
 
-    for i in 1..5 {
-        blockchain
-            .add_block(
-                &BlockBuilder::new()
-                    .payload(&format!("Block {:?}", i))
-                    .timestamp(Utc::now())
-                    .previous_hash(&blockchain.last_block_hash.clone().unwrap())
-                    .key(&public_key)
-                    .hash_it()
-                    .sign_with(&account_a)
-                    .build(),
-            )
-            .unwrap();
-    }
+        let block_3 = BlockBuilder::new()
+            .payload("Block 1")
+            .timestamp(Utc::now())
+            .key(&public_key)
+            .hash_it()
+            .sign_with(&account_a)
+            .build();
 
-    let block_3 = BlockBuilder::new()
-        .payload("Block 1")
-        .timestamp(Utc::now())
-        .key(&public_key)
-        .hash_it()
-        .sign_with(&account_a)
-        .build();
+        // Verifying the signing on the block should fail since this account hasn't signed it
+        let account_b = Wallet::new();
 
-    // Verifying the signing on the block should fail since this account hasn't signed it
-    let account_b = Wallet::new();
+        assert!(block_3.verify_sign_with(&account_a));
+        assert!(!block_3.verify_sign_with(&account_b));
 
-    assert!(block_3.verify_sign_with(&account_a));
-    assert!(!block_3.verify_sign_with(&account_b));
+        assert!(blockchain.verify_integrity().is_ok());
 
-    assert!(blockchain.verify_integrity().is_ok());
+        let public_account_a = PublicAddress::from(&public_key);
 
-    let public_account_a = PublicAddress::from(&public_key);
-
-    assert!(block_3.verify_sign_with(&public_account_a));
+        assert!(block_3.verify_sign_with(&public_account_a));
+    });
 }

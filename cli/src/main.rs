@@ -4,7 +4,7 @@ use blockchain::Configuration;
 async fn main() {
     let config = Configuration::new();
 
-    let mut node = node::Node::new(config);
+    let mut node = node::Node::new(config).await;
 
     node.run().await;
 }

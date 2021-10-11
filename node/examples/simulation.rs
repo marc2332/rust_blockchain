@@ -1,6 +1,7 @@
 #![feature(slice_pattern)]
 #![feature(async_closure)]
 use blockchain::{
+    Block,
     BlockBuilder,
     Configuration,
     Transaction,
@@ -13,6 +14,10 @@ use client::RPCClient;
 use futures::Future;
 use jsonrpc_core::serde_json;
 use log::LevelFilter;
+use mongodb::{
+    options::ClientOptions,
+    Client,
+};
 use node::Node;
 use simple_logger::SimpleLogger;
 use std::{
@@ -23,12 +28,10 @@ use std::{
 fn create_configs() -> Vec<Configuration> {
     (0..5)
         .map(|i| {
-            std::fs::remove_dir_all(&format!("db_{}", i)).ok();
-
             Configuration::from_params(
                 i,
                 &format!("db_{}", i),
-                2000 + i,
+                5000 + i,
                 "127.0.0.1",
                 Wallet::default(),
                 2,
@@ -93,7 +96,7 @@ async fn main() {
 
     let mut senders_threads = Vec::new();
 
-    for _ in 0..2 {
+    for _ in 0..1 {
         for i in 0..5 {
             let (tx, sender) = create_sender(&mut genesis_wallet, i);
             transactions.push(tx);
@@ -112,7 +115,15 @@ async fn main() {
         .build();
 
     for config in node_configurations {
-        let mut node = Node::new(config.clone());
+        let mongo_client = config.mongo_client.clone();
+
+        let db = mongo_client.database(&format!("db_{}", config.id));
+
+        let coll = db.collection::<Block>("blocks");
+
+        coll.drop(None).await.unwrap();
+
+        let mut node = Node::new(config.clone()).await;
         let genesis_block = genesis_block.clone();
 
         nodes_runtimes.push(thread::spawn(move || {
@@ -155,7 +166,7 @@ fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Futu
         .build();
 
     let sender = std::thread::spawn(async move || {
-        let client = RPCClient::new(&format!("http://localhost:{}", 2000 + i))
+        let client = RPCClient::new(&format!("http://localhost:{}", 5000 + i))
             .await
             .unwrap();
 

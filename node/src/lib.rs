@@ -194,8 +194,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(config: Configuration) -> Self {
-        let blockchain = Blockchain::new(config.clone());
+    pub async fn new(config: Configuration) -> Self {
+        let blockchain = Blockchain::new(config.clone()).await;
 
         let wallet = config.wallet.clone();
         let id = config.id;
@@ -265,7 +265,7 @@ impl Node {
         self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
         // Setup the transactions sender threads
-        let transaction_senders = (0..2)
+        let transaction_senders = (0..7)
             .map(|_| create_transaction_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
@@ -367,10 +367,12 @@ fn create_transaction_sender() -> Sender<ThreadMsg> {
                     port,
                 } = rx.recv().unwrap()
                 {
-                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                        .await
-                        .unwrap();
-                    client.add_transactions(transactions).await.ok();
+                    tokio::spawn(async move {
+                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                            .await
+                            .unwrap();
+                        client.add_transactions(transactions).await.ok();
+                    });
                 }
             }
         })
@@ -396,10 +398,12 @@ fn create_block_sender() -> Sender<ThreadMsg> {
                     port,
                 } = rx.recv().unwrap()
                 {
-                    let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                        .await
-                        .unwrap();
-                    client.add_block(block).await.ok();
+                    tokio::spawn(async move {
+                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                            .await
+                            .unwrap();
+                        client.add_block(block).await.ok();
+                    });
                 }
             }
         })
