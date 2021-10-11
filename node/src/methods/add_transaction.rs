@@ -27,7 +27,7 @@ use std::{
 };
 
 static BLOCK_TIME_MAX: i64 = 8000;
-static MINIMUM_MEMPOOL_SIZE: usize = 350;
+static MINIMUM_MEMPOOL_SIZE: usize = 50;
 static TRANSACTIONS_CHUNK_SIZE: usize = 2;
 
 #[derive(Serialize, Deserialize)]
