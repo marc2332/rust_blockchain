@@ -6,8 +6,16 @@ use std::sync::{
     Mutex,
 };
 
-pub fn get_block_with_hash(state: &Arc<Mutex<NodeState>>, hash: String) -> Result<Option<Block>> {
-    let res = state.lock().unwrap().blockchain.get_block_with_hash(hash);
+pub async fn get_block_with_hash(
+    state: &Arc<Mutex<NodeState>>,
+    hash: String,
+) -> Result<Option<Block>> {
+    let res = state
+        .lock()
+        .unwrap()
+        .blockchain
+        .get_block_with_hash(hash)
+        .await;
 
     Ok(res)
 }

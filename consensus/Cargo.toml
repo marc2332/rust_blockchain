@@ -10,4 +10,4 @@ rust-crypto = "0.2.36"
 blockchain = { path = "../blockchain"}
 serde_json = "1.0.66"
 chrono = "0.4.19"
-log = "0.4.14"
+tracing = "0.1"

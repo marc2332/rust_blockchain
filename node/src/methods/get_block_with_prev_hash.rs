@@ -6,7 +6,7 @@ use std::sync::{
     Mutex,
 };
 
-pub fn get_block_with_prev_hash(
+pub async fn get_block_with_prev_hash(
     state: &Arc<Mutex<NodeState>>,
     previous_hash: String,
 ) -> Result<Option<Block>> {
@@ -14,7 +14,8 @@ pub fn get_block_with_prev_hash(
         .lock()
         .unwrap()
         .blockchain
-        .get_block_with_prev_hash(previous_hash);
+        .get_block_with_prev_hash(previous_hash)
+        .await;
 
     Ok(res)
 }

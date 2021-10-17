@@ -37,7 +37,7 @@ impl Blockchain {
     pub async fn new(config: Configuration) -> Self {
         let mut chain = config.get_blocks().await.unwrap();
 
-        log::info!("(Node.{}) Loaded blockchain from database", config.id);
+        tracing::info!("(Node.{}) Loaded blockchain from database", config.id);
 
         let index = chain.len() as usize;
 
@@ -93,7 +93,7 @@ impl Blockchain {
                 false
             } else if let Some(block_hash) = self.last_block_hash.as_ref() {
                 if block_hash.clone() != block.clone().previous_hash.unwrap() {
-                    log::warn!(
+                    tracing::warn!(
                         "(Node.{}) Tried to add a faulty block ({}) to the chain.",
                         self.config.lock().unwrap().id,
                         block.hash.unite()
@@ -109,44 +109,37 @@ impl Blockchain {
 
         if block_can_be_added {
             // Add the block to the database
-            let db_result: Result<(), ()> = {
-                self.config.lock().unwrap().add_block(&block);
-                Ok(())
-            };
+            self.config.lock().unwrap().add_block(&block);
 
-            if db_result.is_ok() {
-                // Update chainstate with the new transactions
-                for tx in transactions.iter() {
-                    self.state.effect_transaction(tx);
-                }
-
-                self.index += 1;
-                self.chain.push(block.clone());
-                self.last_block_hash = Some(block.hash.clone());
-
-                let chain_memory_length = self.config.lock().unwrap().chain_memory_length;
-
-                // Fix the in-memory length of the chain to the configured one
-                if self.chain.len() > chain_memory_length.into() {
-                    self.chain.remove(0);
-                }
-
-                log::info!(
-                    "(Node.{}) Added block [{}] -> {:?} (size of {})",
-                    self.config.lock().unwrap().id,
-                    self.index,
-                    block.hash.unite(),
-                    transactions.len()
-                );
-                Ok(())
-            } else {
-                log::error!(
-                    "(Node.{}) Couldn't add the block to the database.",
-                    self.config.lock().unwrap().id
-                );
-                Err(BlockchainErrors::CouldntAddBlock(block.hash.unite()))
+            // Update chainstate with the new transactions
+            for tx in transactions.iter() {
+                self.state.effect_transaction(tx);
             }
+
+            self.index += 1;
+            self.chain.push(block.clone());
+            self.last_block_hash = Some(block.hash.clone());
+
+            let chain_memory_length = self.config.lock().unwrap().chain_memory_length;
+
+            // Fix the in-memory length of the chain to the configured one
+            if self.chain.len() > chain_memory_length.into() {
+                self.chain.remove(0);
+            }
+
+            tracing::info!(
+                "(Node.{}) Added block [{}] -> {:?} (size of {})",
+                self.config.lock().unwrap().id,
+                self.index,
+                block.hash.unite(),
+                transactions.len()
+            );
+            Ok(())
         } else {
+            tracing::error!(
+                "(Node.{}) Couldn't add the block to the database.",
+                self.config.lock().unwrap().id
+            );
             Err(BlockchainErrors::CouldntAddBlock(block.hash.unite()))
         }
     }
@@ -172,27 +165,29 @@ impl Blockchain {
         verify_integrity(&self.chain)
     }
 
-    pub fn get_block_with_prev_hash(&self, prev_hash: String) -> Option<Block> {
-        for block in &self.chain {
-            if let Some(block_prev_hash) = &block.previous_hash {
-                if block_prev_hash.unite() == prev_hash {
-                    return Some(block.clone());
-                }
-            }
-        }
-        None
+    /*
+     * Get a block that hash the same previous hash
+     */
+    pub async fn get_block_with_prev_hash(&self, prev_hash: String) -> Option<Block> {
+        self.config
+            .lock()
+            .unwrap()
+            .get_block_with_prev_hash(prev_hash)
+            .await
     }
 
-    pub fn get_block_with_hash(&self, hash: String) -> Option<Block> {
-        for block in &self.chain {
-            if block.hash.unite() == hash {
-                return Some(block.clone());
-            }
-        }
-        None
+    /*
+     * Get a block by it's corresponding hash
+     */
+    pub async fn get_block_with_hash(&self, hash: String) -> Option<Block> {
+        self.config.lock().unwrap().get_block_with_hash(hash).await
     }
 }
 
+/*
+ * This iterates over a chain of blocks and makes sure that all the blocks and transactions are correct
+ * This only makes sense to be run on the node startup to make sure the DB has not been modified
+ */
 fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {
     for (i, block) in chain.iter().enumerate() {
         let block_hash = &block.hash;

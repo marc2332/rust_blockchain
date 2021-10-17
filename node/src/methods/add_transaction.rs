@@ -27,8 +27,8 @@ use std::{
 };
 
 static BLOCK_TIME_MAX: i64 = 8000;
-static MINIMUM_MEMPOOL_SIZE: usize = 50;
-static TRANSACTIONS_CHUNK_SIZE: usize = 2;
+static MINIMUM_MEMPOOL_SIZE: usize = 350;
+static TRANSACTIONS_CHUNK_SIZE: usize = 3;
 
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
@@ -37,6 +37,8 @@ pub enum TransactionResult {
 }
 
 pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transaction) {
+    let transaction_history = transaction.get_history();
+
     // Check the transaction isn't already added into the mempool
     let is_tx_cached = state
         .lock()
@@ -142,6 +144,8 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                 // Add the block to the blockchain
                 state.blockchain.add_block(&new_block).unwrap();
 
+                state.blockchain.state.last_forger_was_blocked = false;
+
                 state.elect_new_forger();
 
                 ok_txs.append(&mut bad_txs);
@@ -186,13 +190,13 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     .is_punished(&current_forger.hash_it())
                     && state.blockchain.index > 5
                 {
-                    let previous_forgers_are_blocked =
-                        !state.blockchain.state.missed_forgers.is_empty();
+                    let last_forger_was_blocked = state.blockchain.state.last_forger_was_blocked;
 
                     /*
-                     * It wouldn't be fair to diff the time between last block and now because there has been a blocked forger in between.
+                     * Don't block the new forger if the last forger missed, because that will make him miss it again
+                     * since the time from the last block hasn't change.
                      */
-                    if !previous_forgers_are_blocked {
+                    if !last_forger_was_blocked {
                         let last_block = state.blockchain.chain.last().unwrap();
                         let last_block_time: DateTime<Utc> =
                             DateTime::from_str(&last_block.timestamp).unwrap();
@@ -211,9 +215,11 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                                 .missed_forgers
                                 .insert(current_forger.hash_it(), block_index);
 
+                            state.blockchain.state.last_forger_was_blocked = true;
+
                             state.elect_new_forger();
 
-                            log::warn!("Blocked forger = {}", current_forger.hash_it());
+                            tracing::warn!("Blocked forger = {}", current_forger.hash_it());
                         }
                     }
                 }
@@ -222,19 +228,20 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
             // Forgive older forgers that missed it's block
             for (forger, block_index) in state.blockchain.state.missed_forgers.clone() {
                 if block_index < state.blockchain.index {
-                    log::warn!("Unblocked forger = {}", forger);
+                    tracing::warn!("Unblocked forger = {}", forger);
                     state.blockchain.state.missed_forgers.remove(&forger);
                 }
             }
         }
 
-        log::info!(
-            "(Node.{}) Confirmed transaction ({})",
+        tracing::info!(
+            "(Node.{}) Confirmed transaction ({}) ^{}",
             state.id,
-            state.mempool.pending_transactions.len()
+            state.mempool.pending_transactions.len(),
+            transaction_history
         );
     } else {
-        log::error!(
+        tracing::error!(
             "(Node.{}) Verification of transaction failed",
             state.lock().unwrap().id
         );

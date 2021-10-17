@@ -4,8 +4,12 @@ use crate::{
     Wallet,
 };
 
-use futures_util::stream::StreamExt;
+use futures_util::{
+    stream::StreamExt,
+    TryStreamExt,
+};
 use mongodb::{
+    bson::doc,
     options::{
         ClientOptions,
         ServerAddress,
@@ -116,6 +120,47 @@ impl Configuration {
 
             coll.insert_one(block, None).await.ok();
         });
+    }
+
+    pub async fn get_block_with_prev_hash(&self, prev_hash: String) -> Option<Block> {
+        let db = self.mongo_client.database(&format!("db_{}", self.id));
+
+        let coll = db.collection::<Block>("blocks");
+
+        let mut cursor = coll
+            .find(
+                doc! {
+                    "prev_hash.hash": prev_hash
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        while let Ok(Some(book)) = cursor.try_next().await {
+            return Some(book);
+        }
+        None
+    }
+
+    pub async fn get_block_with_hash(&self, hash: String) -> Option<Block> {
+        let db = self.mongo_client.database(&format!("db_{}", self.id));
+
+        let coll = db.collection::<Block>("blocks");
+        let mut cursor = coll
+            .find(
+                doc! {
+                    "hash.hash": hash
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        while let Ok(Some(book)) = cursor.try_next().await {
+            return Some(book);
+        }
+        None
     }
 }
 

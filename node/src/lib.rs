@@ -19,6 +19,7 @@ use blockchain::{
     Wallet,
 };
 
+use futures::executor::block_on;
 use jsonrpc_core::{
     serde_json,
     IoHandler,
@@ -117,7 +118,7 @@ impl RpcMethods for RpcManager {
     }
 
     fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>> {
-        get_block_with_prev_hash(&self.state, prev_hash)
+        block_on(get_block_with_prev_hash(&self.state, prev_hash))
     }
 
     fn get_node_address(&self) -> Result<String> {
@@ -129,7 +130,7 @@ impl RpcMethods for RpcManager {
     }
 
     fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>> {
-        get_block_with_hash(&self.state, hash)
+        block_on(get_block_with_hash(&self.state, hash))
     }
 
     fn add_transactions(&self, transactions: Vec<Transaction>) -> Result<()> {
@@ -255,7 +256,7 @@ impl Node {
     }
 
     pub async fn run(&mut self) {
-        log::info!("(Node.{}) Booting up node...", self.config.id);
+        tracing::info!("(Node.{}) Booting up node...", self.config.id);
 
         // Setup the transactions handlers threads
         let transaction_handlers = (0..self.config.transaction_threads)
@@ -316,7 +317,7 @@ impl Node {
                 .start_http(&format!("{}:{}", hostname, rpc_port).parse().unwrap())
                 .expect("Unable to start RPC server");
 
-            log::info!("(Node.{}) Running RPC server on port {}", id, rpc_port);
+            tracing::info!("(Node.{}) Running RPC server on port {}", id, rpc_port);
 
             server.wait();
         })

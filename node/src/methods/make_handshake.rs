@@ -11,7 +11,7 @@ pub fn make_handshake(state: &Arc<Mutex<NodeState>>, req: HandshakeRequest) {
         .unwrap()
         .peers
         .insert(req.address, (req.ip.clone(), req.port));
-    log::info!(
+    tracing::info!(
         "(Node.{}) Handshaked by {}:{}",
         state.lock().unwrap().id,
         req.ip,

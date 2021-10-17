@@ -13,26 +13,25 @@ use chrono::Utc;
 use client::RPCClient;
 use futures::Future;
 use jsonrpc_core::serde_json;
-use log::LevelFilter;
 use node::Node;
-use simple_logger::SimpleLogger;
 use std::{
     thread,
     time,
+};
+use tracing_subscriber::{
+    filter::{
+        Directive,
+        EnvFilter,
+    },
+    fmt,
+    prelude::*,
+    Registry,
 };
 
 fn create_configs() -> Vec<Configuration> {
     (0..5)
         .map(|i| {
-            Configuration::from_params(
-                i,
-                5000 + i,
-                "127.0.0.1",
-                Wallet::default(),
-                2,
-                2,
-                "mars",
-            )
+            Configuration::from_params(i, 5000 + i, "127.0.0.1", Wallet::default(), 2, 2, "mars")
         })
         .collect()
 }
@@ -42,14 +41,19 @@ fn create_configs() -> Vec<Configuration> {
  */
 #[tokio::main]
 async fn main() {
-    SimpleLogger::new()
-        .with_timestamps(false)
-        .with_colors(true)
-        .with_level(LevelFilter::Off)
-        .with_module_level("node", LevelFilter::Info)
-        .with_module_level("blockchain", LevelFilter::Info)
-        .init()
-        .unwrap();
+    let file_appender = tracing_appender::rolling::minutely("./", "simulation.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let filter = EnvFilter::default()
+        .add_directive("node=info".parse().unwrap())
+        .add_directive("blockchain=info".parse().unwrap());
+
+    let subscriber = Registry::default()
+        .with(filter)
+        .with(fmt::Layer::default().with_writer(non_blocking))
+        .with(fmt::Layer::default());
+
+    tracing::subscriber::set_global_default(subscriber).expect("Unable to set global subscriber");
 
     let mut node_configurations = create_configs();
 
@@ -57,7 +61,7 @@ async fn main() {
 
     let mut genesis_wallet = Wallet::default();
 
-    log::info!("Starting simulation");
+    tracing::info!("Starting simulation");
 
     let genesis_transaction = TransactionBuilder::new()
         .to_address(&genesis_wallet.get_public().hash_it())
@@ -127,8 +131,20 @@ async fn main() {
                 node.sync_from_discovery_server().await;
 
                 // Create a genesis block if there isn't
-                if node.state.lock().unwrap().blockchain.last_block_hash.is_none() {
-                    node.state.lock().unwrap().blockchain.add_block(&genesis_block).unwrap();
+                if node
+                    .state
+                    .lock()
+                    .unwrap()
+                    .blockchain
+                    .last_block_hash
+                    .is_none()
+                {
+                    node.state
+                        .lock()
+                        .unwrap()
+                        .blockchain
+                        .add_block(&genesis_block)
+                        .unwrap();
                     node.state.lock().unwrap().elect_new_forger();
                 }
 

@@ -14,3 +14,4 @@
 - [ ] Implement a consensus algorithm to prevent bad nodes to ignore certain transactions
 - [ ] Improve simulation by allowing external nodes to join (this would need to have synchronization support)
 - [x] Fix the never-ending memory usage increase
+- [ ] Discard lost blocks after certain block height to avoid spam.

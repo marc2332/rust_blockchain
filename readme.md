@@ -20,5 +20,5 @@ WIP.
 Run:
 ```shell
 cd node
-cargo run --example simulation
+cargo run --example simulation --release
 ```

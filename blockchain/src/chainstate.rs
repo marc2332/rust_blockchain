@@ -25,6 +25,7 @@ pub struct Chainstate {
     pub last_staking_addresses: Vec<Transaction>,
     pub last_forgers: Vec<String>,
     pub missed_forgers: HashMap<String, usize>,
+    pub last_forger_was_blocked: bool,
 }
 
 impl Chainstate {
@@ -35,6 +36,7 @@ impl Chainstate {
             last_staking_addresses: Vec::new(),
             last_forgers: Vec::new(),
             missed_forgers: HashMap::new(),
+            last_forger_was_blocked: false,
         }
     }
 
