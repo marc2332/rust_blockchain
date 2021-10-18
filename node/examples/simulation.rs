@@ -19,10 +19,7 @@ use std::{
     time,
 };
 use tracing_subscriber::{
-    filter::{
-        Directive,
-        EnvFilter,
-    },
+    filter::EnvFilter,
     fmt,
     prelude::*,
     Registry,
@@ -31,7 +28,16 @@ use tracing_subscriber::{
 fn create_configs() -> Vec<Configuration> {
     (0..5)
         .map(|i| {
-            Configuration::from_params(i, 5000 + i, "127.0.0.1", Wallet::default(), 2, 2, "mars")
+            Configuration::from_params(
+                i,
+                5000 + i,
+                7000 + i,
+                "127.0.0.1",
+                Wallet::default(),
+                2,
+                2,
+                "mars",
+            )
         })
         .collect()
 }

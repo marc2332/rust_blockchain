@@ -32,7 +32,6 @@ pub mod methods;
 use jsonrpc_http_server::{
     AccessControlAllowOrigin,
     DomainsValidation,
-    ServerBuilder,
 };
 use methods::{
     add_block,
@@ -164,7 +163,7 @@ pub struct NodeState {
     pub available_tx_sender: usize,
     pub block_senders: Vec<Sender<ThreadMsg>>,
     pub available_block_sender: usize,
-    pub peers: HashMap<String, (String, u16)>,
+    pub peers: HashMap<String, (String, u16, u16)>,
 }
 
 impl NodeState {
@@ -178,13 +177,11 @@ pub enum ThreadMsg {
     AddTransaction(Transaction),
     PropagateTransactions {
         transactions: Vec<Transaction>,
-        hostname: String,
-        port: u16,
     },
     PropagateBlock {
         block: Block,
         hostname: String,
-        port: u16,
+        rpc_port: u16,
     },
 }
 
@@ -224,12 +221,14 @@ impl Node {
     pub async fn sync_from_discovery_server(&mut self) {
         let wallet = self.config.wallet.clone();
         let rpc_port = self.config.rpc_port;
+        let rpc_ws_port = self.config.rpc_ws_port;
 
         let sign = wallet.sign_data(wallet.get_public().hash_it());
 
         let obj = serde_json::json!({
             "address": wallet.get_public().hash_it(),
-            "port": rpc_port,
+            "rpc_port": rpc_port,
+            "rpc_ws_port": rpc_ws_port,
             "key": wallet.get_public(),
             "sign": sign,
         });
@@ -242,7 +241,10 @@ impl Node {
             .await;
 
         let mut peers = match res {
-            Ok(res) => res.json::<HashMap<String, (String, u16)>>().await.unwrap(),
+            Ok(res) => res
+                .json::<HashMap<String, (String, u16, u16)>>()
+                .await
+                .unwrap(),
             _ => HashMap::new(),
         };
 
@@ -250,6 +252,14 @@ impl Node {
 
         if peers.get(&address).is_some() {
             peers.remove(&address);
+        }
+
+        for (_, (hostname, _, rpc_ws_port)) in &peers {
+            self.state
+                .lock()
+                .unwrap()
+                .transaction_senders
+                .push(create_transaction_sender(hostname.clone(), *rpc_ws_port));
         }
 
         self.state.lock().unwrap().peers = peers;
@@ -265,13 +275,6 @@ impl Node {
 
         self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
-        // Setup the transactions sender threads
-        let transaction_senders = (0..7)
-            .map(|_| create_transaction_sender())
-            .collect::<Vec<Sender<ThreadMsg>>>();
-
-        self.state.lock().unwrap().transaction_senders = transaction_senders;
-
         // Setup the blocks sender threads
         let block_senders = (0..2)
             .map(|_| create_block_sender())
@@ -281,20 +284,22 @@ impl Node {
 
         let wallet = self.config.wallet.clone();
         let rpc_port = self.config.rpc_port;
+        let rpc_ws_port = self.config.rpc_ws_port;
         let peers = self.state.lock().unwrap().peers.clone();
         let hostname = self.config.hostname.clone();
         let id = self.config.id;
 
         // Handshake known nodes
         tokio::spawn(async move {
-            for (hostname, port) in peers.values() {
+            for (hostname, node_rpc_port, _) in peers.values() {
                 let handshake = HandshakeRequest {
                     ip: hostname.to_string(),
-                    port: rpc_port,
+                    rpc_port: rpc_port,
+                    rpc_ws_port: rpc_ws_port,
                     address: wallet.get_public().hash_it(),
                 };
 
-                let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                let client = RPCClient::new(&format!("http://{}:{}", hostname, node_rpc_port))
                     .await
                     .unwrap();
 
@@ -302,20 +307,41 @@ impl Node {
             }
         });
 
-        // Setup the JSON RPC server
-        let mut io = IoHandler::default();
-        let manager = RpcManager {
+        let mut ws_io = IoHandler::default();
+        let ws_manager = RpcManager {
             state: self.state.clone(),
         };
-        io.extend_with(manager.to_delegate());
+        ws_io.extend_with(ws_manager.to_delegate());
+
+        let ws_hostname = hostname.clone();
 
         tokio::task::spawn_blocking(move || {
-            let server = ServerBuilder::new(io)
+            let server = jsonrpc_ws_server::ServerBuilder::new(ws_io)
+                .start(&format!("{}:{}", ws_hostname, rpc_ws_port).parse().unwrap())
+                .expect("Unable to start RPC server");
+
+            tracing::info!(
+                "(Node.{}) Running RPC WebSockets server on port {}",
+                id,
+                rpc_ws_port
+            );
+
+            server.wait().unwrap();
+        });
+
+        let mut http_io = IoHandler::default();
+        let http_manager = RpcManager {
+            state: self.state.clone(),
+        };
+        http_io.extend_with(http_manager.to_delegate());
+
+        tokio::task::spawn_blocking(move || {
+            let server = jsonrpc_http_server::ServerBuilder::new(http_io)
                 .cors(DomainsValidation::AllowOnly(vec![
                     AccessControlAllowOrigin::Null,
                 ]))
                 .start_http(&format!("{}:{}", hostname, rpc_port).parse().unwrap())
-                .expect("Unable to start RPC server");
+                .expect("Unable to start RPC HTTP server");
 
             tracing::info!("(Node.{}) Running RPC server on port {}", id, rpc_port);
 
@@ -352,27 +378,30 @@ fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg>
 }
 
 /*
- * Create a thread to propagate transactions
+ * Create a thread for each WebSocket connection to known peers
  */
-fn create_transaction_sender() -> Sender<ThreadMsg> {
+fn create_transaction_sender(hostname: String, rpc_ws_port: u16) -> Sender<ThreadMsg> {
+    use tokio::sync::Mutex; // Use async Mutex
+
     let (tx, rx) = channel();
     let rx = Arc::new(Mutex::new(rx));
+
     thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
+            let client = RPCClient::new_ws(&format!("ws://{}:{}", hostname, rpc_ws_port))
+                .await
+                .unwrap();
+
+            let client = Arc::new(Mutex::new(client));
             loop {
-                let rx = rx.lock().unwrap();
-                if let ThreadMsg::PropagateTransactions {
-                    transactions,
-                    hostname,
-                    port,
-                } = rx.recv().unwrap()
-                {
+                let client = client.clone();
+                let rx = rx.lock().await;
+                if let ThreadMsg::PropagateTransactions { transactions } = rx.recv().unwrap() {
                     tokio::spawn(async move {
-                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
-                            .await
-                            .unwrap();
+                        let client = client.lock().await;
                         client.add_transactions(transactions).await.ok();
+                        drop(client)
                     });
                 }
             }
@@ -396,11 +425,11 @@ fn create_block_sender() -> Sender<ThreadMsg> {
                 if let ThreadMsg::PropagateBlock {
                     block,
                     hostname,
-                    port,
+                    rpc_port,
                 } = rx.recv().unwrap()
                 {
                     tokio::spawn(async move {
-                        let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+                        let client = RPCClient::new(&format!("http://{}:{}", hostname, rpc_port))
                             .await
                             .unwrap();
                         client.add_block(block).await.ok();

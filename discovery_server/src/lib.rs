@@ -25,7 +25,8 @@ use std::{
 #[derive(Serialize, Deserialize, Clone)]
 struct SignalRequest {
     address: String,
-    port: u16,
+    rpc_port: u16,
+    rpc_ws_port: u16,
     key: Key,
     sign: Key,
 }
@@ -46,7 +47,7 @@ async fn signal(
             .lock()
             .unwrap()
             .signalers
-            .insert(data.address.clone(), (ip, data.port));
+            .insert(data.address.clone(), (ip, data.rpc_port, data.rpc_ws_port));
         response
     } else {
         "failed".to_string()
@@ -55,7 +56,7 @@ async fn signal(
 
 #[derive(Default)]
 struct State {
-    signalers: HashMap<String, (String, u16)>,
+    signalers: HashMap<String, (String, u16, u16)>,
 }
 
 #[actix_web::main]

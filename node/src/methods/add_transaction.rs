@@ -71,23 +71,13 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
         // Propagate transactions as chunks
         if state.mempool.chunked_transactions.len() > TRANSACTIONS_CHUNK_SIZE {
             // Propagate the transactions chunk to known peers
-            let peers = state.peers.clone();
             let transaction_senders = state.transaction_senders.clone();
-            for (hostname, port) in peers.values() {
+            for tx_sender in transaction_senders {
                 let transactions = state.mempool.chunked_transactions.clone();
 
-                transaction_senders[state.available_tx_sender]
-                    .send(ThreadMsg::PropagateTransactions {
-                        transactions,
-                        hostname: hostname.clone(),
-                        port: *port,
-                    })
+                tx_sender
+                    .send(ThreadMsg::PropagateTransactions { transactions })
                     .unwrap();
-                state.available_tx_sender += 1;
-
-                if state.available_tx_sender == transaction_senders.len() {
-                    state.available_tx_sender = 0;
-                }
             }
 
             state.mempool.chunked_transactions.clear();
@@ -159,16 +149,16 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                 let block_senders = state.block_senders.clone();
                 let peers = state.peers.clone();
 
-                for (hostname, port) in peers.values() {
+                for (hostname, rpc_port, _) in peers.values() {
                     let hostname = hostname.clone();
-                    let port = *port;
+                    let rpc_port = *rpc_port;
                     let block = new_block.clone();
 
                     block_senders[state.available_block_sender]
                         .send(ThreadMsg::PropagateBlock {
                             block,
                             hostname,
-                            port,
+                            rpc_port,
                         })
                         .unwrap();
                     state.available_block_sender += 1;

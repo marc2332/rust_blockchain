@@ -68,11 +68,11 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             .unite();
 
         // Ask known peers for the missing block
-        for (hostname, port) in peers.values() {
+        for (hostname, rpc_port, _) in peers.values() {
             let hostname = hostname.clone();
-            let port = *port;
+            let rpc_port = *rpc_port;
 
-            let client = RPCClient::new(&format!("http://{}:{}", hostname, port))
+            let client = RPCClient::new(&format!("http://{}:{}", hostname, rpc_port))
                 .await
                 .unwrap();
 

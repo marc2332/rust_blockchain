@@ -3,7 +3,10 @@ use blockchain::{
     Transaction,
 };
 use jsonrpc_client_transports::{
-    transports::http,
+    transports::{
+        http,
+        ws,
+    },
     RpcChannel,
     RpcError,
     RpcResult,
@@ -20,7 +23,8 @@ use serde::{
 pub struct HandshakeRequest {
     pub address: String,
     pub ip: String,
-    pub port: u16,
+    pub rpc_port: u16,
+    pub rpc_ws_port: u16,
 }
 
 #[derive(Clone)]
@@ -35,6 +39,9 @@ impl From<RpcChannel> for RPCClient {
 impl RPCClient {
     pub async fn new(uri: &str) -> Result<Self, RpcError> {
         http::connect(uri).await
+    }
+    pub async fn new_ws(uri: &str) -> Result<Self, RpcError> {
+        ws::try_connect(uri).unwrap().await
     }
 }
 
