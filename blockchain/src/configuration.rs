@@ -26,7 +26,6 @@ pub struct Configuration {
     pub hostname: String,
     pub wallet: Wallet,
     pub transaction_threads: u16,
-    pub chain_memory_length: u16,
     pub chain_name: String,
 }
 
@@ -48,7 +47,6 @@ impl Configuration {
             hostname: "0.0.0.0".to_string(),
             wallet: Wallet::default(),
             transaction_threads: 2,
-            chain_memory_length: 20,
             chain_name: "mars".to_string(),
         }
     }
@@ -60,7 +58,6 @@ impl Configuration {
         hostname: &str,
         wallet: Wallet,
         transaction_threads: u16,
-        chain_memory_length: u16,
         chain_name: &str,
     ) -> Self {
         let mut client_options = ClientOptions::default();
@@ -79,7 +76,6 @@ impl Configuration {
             hostname: hostname.to_string(),
             wallet,
             transaction_threads,
-            chain_memory_length,
             chain_name: chain_name.to_string(),
         }
     }
@@ -141,10 +137,10 @@ impl Configuration {
             .await
             .unwrap();
 
-        while let Ok(Some(book)) = cursor.try_next().await {
-            return Some(book);
+        match cursor.try_next().await {
+            Ok(block) => block,
+            _ => None,
         }
-        None
     }
 
     pub async fn get_block_with_hash(&self, hash: String) -> Option<Block> {
@@ -161,10 +157,10 @@ impl Configuration {
             .await
             .unwrap();
 
-        while let Ok(Some(book)) = cursor.try_next().await {
-            return Some(book);
+        match cursor.try_next().await {
+            Ok(block) => block,
+            _ => None,
         }
-        None
     }
 }
 

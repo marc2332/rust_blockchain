@@ -10,7 +10,10 @@ use serde::{
     Serialize,
 };
 
-use crate::Key;
+use crate::{
+    Key,
+    Transaction,
+};
 
 static HASH_VERSION: u8 = 1;
 
@@ -22,15 +25,16 @@ pub struct BlockHash {
 
 impl BlockHash {
     pub fn new(
-        payload: String,
+        transactions: &[Transaction],
         timestamp: String,
         previous_hash: Option<BlockHash>,
         key: Key,
     ) -> Self {
         let mut hasher = Sha3::new(Sha3Mode::Keccak256);
+        let transactions = serde_json::to_string(&transactions).unwrap();
 
         hasher.input_str(&HASH_VERSION.to_string());
-        hasher.input_str(&payload);
+        hasher.input_str(&transactions);
         hasher.input_str(&timestamp);
         hasher.input_str(&key.to_string());
 

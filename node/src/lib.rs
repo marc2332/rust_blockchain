@@ -96,8 +96,12 @@ impl RpcMethods for RpcManager {
         Ok(())
     }
 
+    /*
+     * Handle incoming transactions
+     */
     fn add_transaction(&self, transaction: Transaction) -> Result<()> {
         let mut state = self.state.lock().unwrap();
+
         state.transaction_handlers[state.available_tx_handler]
             .send(ThreadMsg::AddTransaction(transaction))
             .unwrap();
@@ -108,6 +112,9 @@ impl RpcMethods for RpcManager {
         Ok(())
     }
 
+    /*
+     * Handle incoming blocks
+     */
     fn add_block(&self, block: Block) -> Result<()> {
         let state = self.state.clone();
         tokio::spawn(async move {
@@ -254,7 +261,7 @@ impl Node {
             peers.remove(&address);
         }
 
-        for (_, (hostname, _, rpc_ws_port)) in &peers {
+        for (hostname, _, rpc_ws_port) in peers.values() {
             self.state
                 .lock()
                 .unwrap()
@@ -276,7 +283,7 @@ impl Node {
         self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
         // Setup the blocks sender threads
-        let block_senders = (0..2)
+        let block_senders = (0..5)
             .map(|_| create_block_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
@@ -294,8 +301,8 @@ impl Node {
             for (hostname, node_rpc_port, _) in peers.values() {
                 let handshake = HandshakeRequest {
                     ip: hostname.to_string(),
-                    rpc_port: rpc_port,
-                    rpc_ws_port: rpc_ws_port,
+                    rpc_port,
+                    rpc_ws_port,
                     address: wallet.get_public().hash_it(),
                 };
 
@@ -340,6 +347,7 @@ impl Node {
                 .cors(DomainsValidation::AllowOnly(vec![
                     AccessControlAllowOrigin::Null,
                 ]))
+                .threads(3)
                 .start_http(&format!("{}:{}", hostname, rpc_port).parse().unwrap())
                 .expect("Unable to start RPC HTTP server");
 

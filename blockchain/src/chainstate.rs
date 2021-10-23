@@ -44,7 +44,15 @@ impl Chainstate {
         self.missed_forgers.contains_key(address)
     }
 
-    pub fn has_forger(&self, address: &str) -> bool {
+    pub fn add_recent_forger(&mut self, address: &str) {
+        if self.last_forgers.len() > 1 {
+            self.last_forgers.remove(0);
+        }
+
+        self.last_forgers.push(address.to_string());
+    }
+
+    pub fn has_recent_forger(&self, address: &str) -> bool {
         for forger in &self.last_forgers {
             if forger == address {
                 return true;
@@ -70,7 +78,7 @@ impl Chainstate {
         let chain = self.config.lock().unwrap().get_blocks().await.unwrap();
 
         for block in chain.iter() {
-            let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+            let transactions = &block.transactions;
             for tx in transactions.iter() {
                 self.effect_transaction(tx);
             }

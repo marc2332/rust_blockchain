@@ -22,7 +22,7 @@ fn test() {
         blockchain
             .add_block(
                 &BlockBuilder::new()
-                    .payload("block 1")
+                    .transactions(&vec![])
                     .timestamp(Utc::now())
                     .key(&public_key)
                     .hash_it()
@@ -36,7 +36,7 @@ fn test() {
         blockchain
             .add_block(
                 &BlockBuilder::new()
-                    .payload(&format!("Block {:?}", i))
+                    .transactions(&vec![])
                     .timestamp(Utc::now())
                     .previous_hash(&blockchain.last_block_hash.clone().unwrap())
                     .key(&public_key)
@@ -48,7 +48,7 @@ fn test() {
     }
 
     let block_3 = BlockBuilder::new()
-        .payload("Block 1")
+        .transactions(&vec![])
         .timestamp(Utc::now())
         .key(&public_key)
         .hash_it()

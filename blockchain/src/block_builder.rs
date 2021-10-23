@@ -7,6 +7,7 @@ use crate::{
     Block,
     BlockHash,
     Key,
+    Transaction,
     Wallet,
 };
 
@@ -14,7 +15,7 @@ pub struct BlockBuilder {
     pub hash: Option<BlockHash>,
     pub previous_hash: Option<BlockHash>,
     pub timestamp: Option<DateTime<Utc>>,
-    pub payload: Option<String>,
+    pub transactions: Vec<Transaction>,
     pub key: Option<Key>,
     pub signature: Option<Key>,
 }
@@ -25,14 +26,14 @@ impl BlockBuilder {
             hash: None,
             previous_hash: None,
             timestamp: None,
-            payload: None,
+            transactions: vec![],
             key: None,
             signature: None,
         }
     }
 
-    pub fn payload(&mut self, payload: &str) -> &mut Self {
-        self.payload = Some(payload.to_string());
+    pub fn transactions(&mut self, transactions: &[Transaction]) -> &mut Self {
+        self.transactions = transactions.to_vec();
         self
     }
 
@@ -58,7 +59,7 @@ impl BlockBuilder {
 
     pub fn hash_it(&mut self) -> &mut Self {
         self.hash = Some(BlockHash::new(
-            self.payload.as_ref().unwrap().to_string(),
+            &self.transactions,
             self.timestamp.unwrap().to_string(),
             self.previous_hash.clone(),
             self.key.as_ref().unwrap().clone(),
@@ -68,7 +69,7 @@ impl BlockBuilder {
 
     pub fn build(&self) -> Block {
         Block::new(
-            self.payload.as_ref().unwrap(),
+            self.transactions.clone(),
             self.timestamp.unwrap(),
             self.hash.as_ref().unwrap(),
             &self.previous_hash,

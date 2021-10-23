@@ -12,7 +12,6 @@ use blockchain::{
 use chrono::Utc;
 use client::RPCClient;
 use futures::Future;
-use jsonrpc_core::serde_json;
 use node::Node;
 use std::{
     thread,
@@ -34,8 +33,7 @@ fn create_configs() -> Vec<Configuration> {
                 7000 + i,
                 "127.0.0.1",
                 Wallet::default(),
-                2,
-                2,
+                5,
                 "mars",
             )
         })
@@ -109,10 +107,8 @@ async fn main() {
         }
     }
 
-    let block_data = serde_json::to_string(&transactions).unwrap();
-
     let genesis_block = BlockBuilder::new()
-        .payload(&block_data)
+        .transactions(&transactions)
         .timestamp(Utc::now())
         .key(&genesis_wallet.get_public())
         .hash_it()
@@ -180,7 +176,7 @@ fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Futu
         .build();
 
     let sender = std::thread::spawn(async move || {
-        let client = RPCClient::new(&format!("http://localhost:{}", 5000 + i))
+        let client = RPCClient::new_ws(&format!("ws://127.0.0.1:{}", 7000 + i))
             .await
             .unwrap();
 

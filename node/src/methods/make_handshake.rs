@@ -1,4 +1,7 @@
-use crate::NodeState;
+use crate::{
+    create_transaction_sender,
+    NodeState,
+};
 use client::HandshakeRequest;
 use std::sync::{
     Arc,
@@ -11,6 +14,11 @@ pub fn make_handshake(state: &Arc<Mutex<NodeState>>, req: HandshakeRequest) {
         .unwrap()
         .peers
         .insert(req.address, (req.ip.clone(), req.rpc_port, req.rpc_ws_port));
+    state
+        .lock()
+        .unwrap()
+        .transaction_senders
+        .push(create_transaction_sender(req.ip.clone(), req.rpc_ws_port));
     tracing::info!(
         "(Node.{}) Handshaked by {}:{}",
         state.lock().unwrap().id,

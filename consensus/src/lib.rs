@@ -13,7 +13,7 @@ pub enum ConsensusErrors {
  * Algorithm to randomly take a block creator(block forger) from people who have staked a small ammount on previous blocks
  */
 pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors> {
-    let stakings = &blockchain.state.last_staking_addresses;
+    let stakings = blockchain.state.last_staking_addresses.clone();
 
     let last_block = blockchain.chain.last().unwrap();
 
@@ -29,18 +29,16 @@ pub fn elect_forger(blockchain: &mut Blockchain) -> Result<Key, ConsensusErrors>
                 ..
             } = tx
             {
-                if !blockchain.state.has_forger(from_address)
-                    && !blockchain.state.is_punished(from_address)
-                    && hash.contains(&last_block.hash.hash[0..len])
-                {
-                    if blockchain.state.last_forgers.len() >= stakings.len() - 2 {
-                        blockchain.state.last_forgers.remove(0);
-                    }
+                // Forger wasn't recently chose
+                let forger_is_not_recent = !blockchain.state.has_recent_forger(from_address);
+                // Forger is not punished because of missing it's slot
+                let forger_is_not_punished = !blockchain.state.is_punished(from_address);
+                // The forger is elected
+                let forger_won = hash.contains(&last_block.hash.hash[0..len]);
 
-                    blockchain.state.last_forgers.push(from_address.to_string());
-
+                if forger_is_not_recent && forger_is_not_punished && forger_won {
+                    blockchain.state.add_recent_forger(from_address);
                     forger = Some(author_public_key);
-
                     break;
                 }
             }

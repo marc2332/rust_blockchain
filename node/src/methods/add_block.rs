@@ -10,10 +10,8 @@ use crate::{
 use blockchain::{
     Block,
     PublicAddress,
-    Transaction,
 };
 use client::RPCClient;
-use jsonrpc_http_server::jsonrpc_core::*;
 
 pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
     let is_block_ok = {
@@ -26,10 +24,8 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
          * this lost block will be tried to be added. Having a lost block might be due to latency.
          */
         if block.verify_sign_with(&PublicAddress::from(&block.key)) {
-            let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
             let mut chainstate = state.lock().unwrap().blockchain.state.clone();
-
-            Mempool::verify_veracity_of_incoming_transactions(&transactions, &mut chainstate)
+            Mempool::verify_veracity_of_incoming_transactions(&block.transactions, &mut chainstate)
         } else {
             false
         }
@@ -47,10 +43,8 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             // Elect the next forger
             state.elect_new_forger();
 
-            let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
-
             // Remove the block transactions from the mempool
-            for tx in block_txs {
+            for tx in &block.transactions {
                 state.mempool.remove_transaction(&tx.get_hash())
             }
         }
@@ -122,9 +116,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
                 any_recovered_block = true;
 
                 // Remove confirmed transactions from the mempool
-                let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
-
-                for tx in block_txs {
+                for tx in &block.transactions {
                     state.mempool.remove_transaction(&tx.get_hash());
                 }
             }

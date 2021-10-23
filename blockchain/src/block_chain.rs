@@ -35,7 +35,7 @@ pub enum BlockchainErrors {
 
 impl Blockchain {
     pub async fn new(config: Configuration) -> Self {
-        let mut chain = config.get_blocks().await.unwrap();
+        let chain = config.get_blocks().await.unwrap();
 
         tracing::info!("(Node.{}) Loaded blockchain from database", config.id);
 
@@ -56,15 +56,6 @@ impl Blockchain {
 
         state.load_from_chain().await;
 
-        let chain_memory_length = config.lock().unwrap().chain_memory_length;
-
-        // Just keep the last configured length of blocks in memory
-        if chain.len() >= chain_memory_length.into() {
-            chain.reverse();
-            chain.truncate(chain_memory_length.into());
-            chain.reverse();
-        }
-
         Self {
             chain,
             index,
@@ -81,7 +72,7 @@ impl Blockchain {
         let mut block = block.clone();
         block.index = Some(self.index + 1);
 
-        let transactions: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+        let transactions = &block.transactions;
 
         // Make sure that adding the block to the chain won't break it's integrity
         let block_can_be_added = {
@@ -119,13 +110,6 @@ impl Blockchain {
             self.index += 1;
             self.chain.push(block.clone());
             self.last_block_hash = Some(block.hash.clone());
-
-            let chain_memory_length = self.config.lock().unwrap().chain_memory_length;
-
-            // Fix the in-memory length of the chain to the configured one
-            if self.chain.len() > chain_memory_length.into() {
-                self.chain.remove(0);
-            }
 
             tracing::info!(
                 "(Node.{}) Added block [{}] -> {:?} (size of {})",
@@ -192,7 +176,7 @@ fn verify_integrity(chain: &[Block]) -> Result<(), BlockchainErrors> {
     for (i, block) in chain.iter().enumerate() {
         let block_hash = &block.hash;
         let block_author = block.key.hash_it();
-        let block_txs: Vec<Transaction> = serde_json::from_str(&block.payload).unwrap();
+        let block_txs = &block.transactions;
 
         for (tx_i, tx) in block_txs.iter().enumerate() {
             if let Transaction::COINBASE { hash, .. } = tx {

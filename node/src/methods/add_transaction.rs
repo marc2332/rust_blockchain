@@ -26,9 +26,9 @@ use std::{
     },
 };
 
-static BLOCK_TIME_MAX: i64 = 8000;
-static MINIMUM_MEMPOOL_SIZE: usize = 350;
-static TRANSACTIONS_CHUNK_SIZE: usize = 3;
+static BLOCK_TIME_MAX: i64 = 5000;
+static MINIMUM_MEMPOOL_SIZE: usize = 100;
+static TRANSACTIONS_CHUNK_SIZE: usize = 4;
 
 #[derive(Serialize, Deserialize)]
 pub enum TransactionResult {
@@ -109,61 +109,62 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                     &mut chainstate,
                 );
 
-                // Coinbase transaction sent to the block forger as a reward
-                let reward_tx = TransactionBuilder::new()
-                    .to_address(&state.wallet.get_public().hash_it())
-                    .ammount(10)
-                    .is_type(TransactionType::COINBASE)
-                    .with_wallet(&mut state.wallet)
-                    .build();
+                // Make sure there is still a the minimum ammount of valid transactions to create a mempool
+                if true {
+                    // Coinbase transaction sent to the block forger as a reward
+                    let reward_tx = TransactionBuilder::new()
+                        .to_address(&state.wallet.get_public().hash_it())
+                        .ammount(10)
+                        .is_type(TransactionType::COINBASE)
+                        .with_wallet(&mut state.wallet)
+                        .build();
 
-                // Also add the block forging reward to the block
-                ok_txs.push(reward_tx);
+                    // Also add the block forging reward to the block
+                    ok_txs.push(reward_tx);
 
-                let block_data = serde_json::to_string(&ok_txs).unwrap();
+                    let new_block = BlockBuilder::new()
+                        .transactions(&ok_txs)
+                        .timestamp(Utc::now())
+                        .key(&state.wallet.get_public())
+                        .previous_hash(&state.blockchain.last_block_hash.clone().unwrap())
+                        .hash_it()
+                        .sign_with(&state.wallet)
+                        .build();
 
-                let new_block = BlockBuilder::new()
-                    .payload(&block_data)
-                    .timestamp(Utc::now())
-                    .key(&state.wallet.get_public())
-                    .previous_hash(&state.blockchain.last_block_hash.clone().unwrap())
-                    .hash_it()
-                    .sign_with(&state.wallet)
-                    .build();
+                    // Add the block to the blockchain
+                    state.blockchain.add_block(&new_block).unwrap();
 
-                // Add the block to the blockchain
-                state.blockchain.add_block(&new_block).unwrap();
+                    state.blockchain.state.last_forger_was_blocked = false;
 
-                state.blockchain.state.last_forger_was_blocked = false;
+                    state.elect_new_forger();
 
-                state.elect_new_forger();
+                    ok_txs.append(&mut bad_txs);
 
-                ok_txs.append(&mut bad_txs);
+                    // Remove all good and bad transactions from the mempool
+                    for tx in ok_txs {
+                        state.mempool.remove_transaction(&tx.get_hash());
+                    }
 
-                // Remove all good and bad transactions from the mempool
-                for tx in ok_txs {
-                    state.mempool.remove_transaction(&tx.get_hash());
-                }
+                    // Propagate the block
+                    let block_senders = state.block_senders.clone();
+                    let peers = state.peers.clone();
 
-                // Propagate the block
-                let block_senders = state.block_senders.clone();
-                let peers = state.peers.clone();
+                    for (hostname, rpc_port, _) in peers.values() {
+                        let hostname = hostname.clone();
+                        let rpc_port = *rpc_port;
+                        let block = new_block.clone();
 
-                for (hostname, rpc_port, _) in peers.values() {
-                    let hostname = hostname.clone();
-                    let rpc_port = *rpc_port;
-                    let block = new_block.clone();
-
-                    block_senders[state.available_block_sender]
-                        .send(ThreadMsg::PropagateBlock {
-                            block,
-                            hostname,
-                            rpc_port,
-                        })
-                        .unwrap();
-                    state.available_block_sender += 1;
-                    if state.available_block_sender == block_senders.len() {
-                        state.available_block_sender = 0;
+                        block_senders[state.available_block_sender]
+                            .send(ThreadMsg::PropagateBlock {
+                                block,
+                                hostname,
+                                rpc_port,
+                            })
+                            .unwrap();
+                        state.available_block_sender += 1;
+                        if state.available_block_sender == block_senders.len() {
+                            state.available_block_sender = 0;
+                        }
                     }
                 }
             }
@@ -196,6 +197,7 @@ pub async fn add_transaction(state: &Arc<Mutex<NodeState>>, transaction: Transac
                         let time_diff = current_time.signed_duration_since(last_block_time);
 
                         // Punish the forger if he missed for configured time
+
                         if time_diff.num_milliseconds() > BLOCK_TIME_MAX {
                             // Block creation timeout
                             let block_index = state.blockchain.index;

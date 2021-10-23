@@ -1,5 +1,4 @@
 use argh::FromArgs;
-use blockchain::Transaction;
 use client::RPCClient;
 use crossterm::{
     event::{
@@ -191,9 +190,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let new_block = client.get_block_with_hash(blockchain_res.0).await;
 
                     if let Ok(Some(new_block)) = new_block {
-                        let txs: Vec<Transaction> =
-                            serde_json::from_str(&new_block.payload).unwrap();
-                        *block_size.lock().unwrap() = u128::try_from(txs.len()).unwrap()
+                        *block_size.lock().unwrap() =
+                            u128::try_from(new_block.transactions.len()).unwrap()
                     }
                 }
 
@@ -262,8 +260,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 Block::default()
                                     .title(format!(
                                         "node {} (Block height: {})",
-                                        i,
-                                        blockchain_data[i].1.to_string()
+                                        i, blockchain_data[i].1
                                     ))
                                     .borders(Borders::ALL),
                             )

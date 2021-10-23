@@ -15,3 +15,4 @@
 - [ ] Improve simulation by allowing external nodes to join (this would need to have synchronization support)
 - [x] Fix the never-ending memory usage increase
 - [ ] Discard lost blocks after certain block height to avoid spam.
+- [ ] A metrics module that sends information such as new blocks or new txs, etc... through a WebSockets connection to an external point such as a server that could display this data in a frontend such as website.

@@ -11,6 +11,7 @@ use crate::{
     BlockHash,
     Key,
     SignVerifier,
+    Transaction,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,7 +19,7 @@ pub struct Block {
     pub hash: BlockHash,
     pub previous_hash: Option<BlockHash>,
     pub timestamp: String,
-    pub payload: String,
+    pub transactions: Vec<Transaction>,
     pub key: Key,
     pub signature: Key,
     pub index: Option<usize>,
@@ -30,7 +31,7 @@ pub enum BlocksErrors {
 
 impl Block {
     pub fn new(
-        payload: &str,
+        transactions: Vec<Transaction>,
         timestamp: DateTime<Utc>,
         hash: &BlockHash,
         previous_hash: &Option<BlockHash>,
@@ -38,14 +39,13 @@ impl Block {
         signature: &Key,
     ) -> Self {
         let timestamp = timestamp.to_string();
-        let payload = payload.to_string();
         let signature = signature.clone();
         let hash = hash.clone();
         let previous_hash = previous_hash.clone();
         Self {
             hash,
             timestamp,
-            payload,
+            transactions,
             previous_hash,
             key: key.clone(),
             signature,
@@ -55,7 +55,7 @@ impl Block {
 
     pub fn verify_integrity(&self) -> Result<(), BlocksErrors> {
         let must_hash = BlockHash::new(
-            self.payload.clone(),
+            &self.transactions,
             self.timestamp.clone(),
             self.previous_hash.clone(),
             self.key.clone(),
