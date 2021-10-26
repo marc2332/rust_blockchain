@@ -1,7 +1,13 @@
+use std::sync::{
+    Arc,
+    Mutex,
+};
+
 use blockchain::{
     BlockBuilder,
     Blockchain,
     Configuration,
+    Metrics,
     PublicAddress,
     Wallet,
 };
@@ -11,7 +17,10 @@ use tokio_test::block_on;
 #[test]
 
 fn test() {
-    let mut blockchain = block_on(Blockchain::new(Configuration::new()));
+    let mut blockchain = block_on(Blockchain::new(
+        Configuration::new(),
+        Arc::new(Mutex::new(Metrics::new(vec![]))),
+    ));
 
     assert!(blockchain.verify_integrity().is_ok());
 

@@ -5,5 +5,7 @@ Different utils to operate a blockchain:
 - Chainstate
 - Public-private keys and wallets
 - Transaction
+- Metrics
+- Configuration
 
 See `./tests/general.rs` to see some examples

@@ -8,6 +8,7 @@ use crate::{
     BlockHash,
     Chainstate,
     Configuration,
+    Metrics,
     PublicAddress,
     Transaction,
 };
@@ -19,6 +20,7 @@ pub struct Blockchain {
     pub last_block_hash: Option<BlockHash>,
     pub config: Arc<Mutex<Configuration>>,
     pub state: Chainstate,
+    pub metrics: Arc<Mutex<Metrics>>,
 }
 
 #[derive(Debug)]
@@ -34,7 +36,7 @@ pub enum BlockchainErrors {
 }
 
 impl Blockchain {
-    pub async fn new(config: Configuration) -> Self {
+    pub async fn new(config: Configuration, metrics: Arc<Mutex<Metrics>>) -> Self {
         let chain = config.get_blocks().await.unwrap();
 
         tracing::info!("(Node.{}) Loaded blockchain from database", config.id);
@@ -62,6 +64,7 @@ impl Blockchain {
             last_block_hash,
             config,
             state,
+            metrics,
         }
     }
 
@@ -108,8 +111,18 @@ impl Blockchain {
             }
 
             self.index += 1;
+
+            // Keep the chain at length 1 for now
+            if !self.chain.is_empty() {
+                self.chain.remove(0);
+            }
+
             self.chain.push(block.clone());
+
             self.last_block_hash = Some(block.hash.clone());
+
+            // Announce to the metric listeners a new block was created
+            self.metrics.lock().unwrap().new_block(block.clone());
 
             tracing::info!(
                 "(Node.{}) Added block [{}] -> {:?} (size of {})",

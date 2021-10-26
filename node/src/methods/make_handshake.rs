@@ -1,5 +1,5 @@
 use crate::{
-    create_transaction_sender,
+    server,
     NodeState,
 };
 use client::HandshakeRequest;
@@ -18,7 +18,10 @@ pub fn make_handshake(state: &Arc<Mutex<NodeState>>, req: HandshakeRequest) {
         .lock()
         .unwrap()
         .transaction_senders
-        .push(create_transaction_sender(req.ip.clone(), req.rpc_ws_port));
+        .push(server::create_transaction_sender(
+            req.ip.clone(),
+            req.rpc_ws_port,
+        ));
     tracing::info!(
         "(Node.{}) Handshaked by {}:{}",
         state.lock().unwrap().id,

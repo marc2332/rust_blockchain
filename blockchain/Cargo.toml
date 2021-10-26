@@ -14,6 +14,12 @@ tracing = "0.1"
 tokio = { version = "1.11.0", features = ["rt-multi-thread", "macros"]}
 mongodb = "2.0.0"
 futures-util = "0.3.17"
+jsonrpc_client = { version = "*", features = ["reqwest", "surf", "isahc", "macros"] }
+reqwest = "0.11.4"
+jsonrpc-derive = "18.0.0"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = "18.0.0"
+jsonrpc-client-transports = "18.0.0"
 
 [dev-dependencies]
 tokio-test = "0.4.2"

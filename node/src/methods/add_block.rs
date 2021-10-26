@@ -11,7 +11,7 @@ use blockchain::{
     Block,
     PublicAddress,
 };
-use client::RPCClient;
+use client::NodeClient;
 
 pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
     let is_block_ok = {
@@ -66,7 +66,7 @@ pub async fn add_block(state: &Arc<Mutex<NodeState>>, block: Block) {
             let hostname = hostname.clone();
             let rpc_port = *rpc_port;
 
-            let client = RPCClient::new(&format!("http://{}:{}", hostname, rpc_port))
+            let client = NodeClient::new(&format!("http://{}:{}", hostname, rpc_port))
                 .await
                 .unwrap();
 

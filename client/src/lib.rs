@@ -28,24 +28,30 @@ pub struct HandshakeRequest {
 }
 
 #[derive(Clone)]
-pub struct RPCClient(TypedClient);
+pub struct NodeClient(TypedClient);
 
-impl From<RpcChannel> for RPCClient {
+impl From<RpcChannel> for NodeClient {
     fn from(channel: RpcChannel) -> Self {
-        RPCClient(channel.into())
+        NodeClient(channel.into())
     }
 }
 
-impl RPCClient {
+impl NodeClient {
+    /*
+     * HTTP client
+     */
     pub async fn new(uri: &str) -> Result<Self, RpcError> {
         http::connect(uri).await
     }
+    /*
+     * WebSockets client
+     */
     pub async fn new_ws(uri: &str) -> Result<Self, RpcError> {
         ws::try_connect(uri).unwrap().await
     }
 }
 
-impl RPCClient {
+impl NodeClient {
     pub fn get_chain_length(&self) -> impl Future<Output = RpcResult<(String, usize)>> {
         self.0
             .call_method("get_chain_length", "(String, Number)", ())

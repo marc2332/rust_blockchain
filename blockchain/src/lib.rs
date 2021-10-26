@@ -5,6 +5,7 @@ mod block_hash;
 mod chainstate;
 mod configuration;
 mod key;
+mod metrics;
 mod public_address;
 mod transaction;
 mod transaction_builder;
@@ -20,6 +21,10 @@ pub use block_hash::BlockHash;
 pub use chainstate::Chainstate;
 pub use configuration::Configuration;
 pub use key::Key;
+pub use metrics::{
+    Metrics,
+    MetricsClient,
+};
 pub use public_address::PublicAddress;
 pub use transaction::Transaction;
 pub use transaction_builder::{

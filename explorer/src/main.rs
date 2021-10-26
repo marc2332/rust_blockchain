@@ -1,5 +1,5 @@
 use argh::FromArgs;
-use client::RPCClient;
+use client::NodeClient;
 use crossterm::{
     event::{
         self,
@@ -156,7 +156,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         tokio::spawn(async move {
             loop {
-                let client = RPCClient::new(&format!("http://localhost:{}", 5000 + i))
+                let client = NodeClient::new(&format!("http://localhost:{}", 5000 + i))
                     .await
                     .unwrap();
 

@@ -5,17 +5,14 @@ use std::sync::{
     Mutex,
 };
 
-use std::{
-    collections::HashMap,
-    sync::mpsc::channel,
-    thread,
-};
+use std::collections::HashMap;
 
 use blockchain::{
     Block,
     Blockchain,
     Configuration,
     Key,
+    Metrics,
     Wallet,
 };
 
@@ -28,6 +25,7 @@ use jsonrpc_core::{
 use jsonrpc_derive::rpc;
 pub mod mempool;
 pub mod methods;
+pub mod server;
 
 use jsonrpc_http_server::{
     AccessControlAllowOrigin,
@@ -35,7 +33,6 @@ use jsonrpc_http_server::{
 };
 use methods::{
     add_block,
-    add_transaction,
     get_address_ammount,
     get_block_with_hash,
     get_block_with_prev_hash,
@@ -46,11 +43,12 @@ use methods::{
 
 use client::{
     HandshakeRequest,
-    RPCClient,
+    NodeClient,
 };
 
 use blockchain::Transaction;
 use mempool::Mempool;
+use server::ThreadMsg;
 
 #[rpc]
 pub trait RpcMethods {
@@ -167,7 +165,6 @@ pub struct NodeState {
     pub transaction_handlers: Vec<Sender<ThreadMsg>>,
     pub available_tx_handler: usize,
     pub transaction_senders: Vec<Sender<ThreadMsg>>,
-    pub available_tx_sender: usize,
     pub block_senders: Vec<Sender<ThreadMsg>>,
     pub available_block_sender: usize,
     pub peers: HashMap<String, (String, u16, u16)>,
@@ -180,18 +177,6 @@ impl NodeState {
     }
 }
 
-pub enum ThreadMsg {
-    AddTransaction(Transaction),
-    PropagateTransactions {
-        transactions: Vec<Transaction>,
-    },
-    PropagateBlock {
-        block: Block,
-        hostname: String,
-        rpc_port: u16,
-    },
-}
-
 #[derive(Clone)]
 pub struct Node {
     pub config: Configuration,
@@ -200,13 +185,16 @@ pub struct Node {
 
 impl Node {
     pub async fn new(config: Configuration) -> Self {
-        let blockchain = Blockchain::new(config.clone()).await;
+        // Create the metrics manager
+        let metrics = Arc::new(Mutex::new(Metrics::new(vec![])));
+
+        let blockchain = Blockchain::new(config.clone(), metrics).await;
 
         let wallet = config.wallet.clone();
         let id = config.id;
 
         // Create the node state
-        let state = Arc::new(std::sync::Mutex::new(NodeState {
+        let state = Arc::new(Mutex::new(NodeState {
             blockchain,
             mempool: Mempool::default(),
             lost_blocks: HashMap::new(),
@@ -216,7 +204,6 @@ impl Node {
             transaction_handlers: Vec::new(),
             available_tx_handler: 0,
             transaction_senders: Vec::new(),
-            available_tx_sender: 0,
             block_senders: Vec::new(),
             available_block_sender: 0,
             peers: HashMap::new(),
@@ -266,7 +253,10 @@ impl Node {
                 .lock()
                 .unwrap()
                 .transaction_senders
-                .push(create_transaction_sender(hostname.clone(), *rpc_ws_port));
+                .push(server::create_transaction_sender(
+                    hostname.clone(),
+                    *rpc_ws_port,
+                ));
         }
 
         self.state.lock().unwrap().peers = peers;
@@ -277,14 +267,14 @@ impl Node {
 
         // Setup the transactions handlers threads
         let transaction_handlers = (0..self.config.transaction_threads)
-            .map(|_| create_transaction_handler(self.state.clone()))
+            .map(|_| server::create_transaction_handler(self.state.clone()))
             .collect::<Vec<Sender<ThreadMsg>>>();
 
         self.state.lock().unwrap().transaction_handlers = transaction_handlers;
 
         // Setup the blocks sender threads
         let block_senders = (0..5)
-            .map(|_| create_block_sender())
+            .map(|_| server::create_block_sender())
             .collect::<Vec<Sender<ThreadMsg>>>();
 
         self.state.lock().unwrap().block_senders = block_senders;
@@ -306,7 +296,7 @@ impl Node {
                     address: wallet.get_public().hash_it(),
                 };
 
-                let client = RPCClient::new(&format!("http://{}:{}", hostname, node_rpc_port))
+                let client = NodeClient::new(&format!("http://{}:{}", hostname, node_rpc_port))
                     .await
                     .unwrap();
 
@@ -358,94 +348,4 @@ impl Node {
         .await
         .unwrap();
     }
-}
-
-/*
- * Create a thread to receive transactions
- */
-fn create_transaction_handler(state: Arc<Mutex<NodeState>>) -> Sender<ThreadMsg> {
-    let (tx, rx) = channel();
-    let rx = Arc::new(Mutex::new(rx));
-
-    thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            loop {
-                let rx = rx.lock().unwrap();
-                let state = state.clone();
-                if let ThreadMsg::AddTransaction(transaction) = rx.recv().unwrap() {
-                    tokio::spawn(async move {
-                        add_transaction(&state, transaction).await;
-                    });
-                }
-            }
-        })
-    });
-
-    tx
-}
-
-/*
- * Create a thread for each WebSocket connection to known peers
- */
-fn create_transaction_sender(hostname: String, rpc_ws_port: u16) -> Sender<ThreadMsg> {
-    use tokio::sync::Mutex; // Use async Mutex
-
-    let (tx, rx) = channel();
-    let rx = Arc::new(Mutex::new(rx));
-
-    thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let client = RPCClient::new_ws(&format!("ws://{}:{}", hostname, rpc_ws_port))
-                .await
-                .unwrap();
-
-            let client = Arc::new(Mutex::new(client));
-            loop {
-                let client = client.clone();
-                let rx = rx.lock().await;
-                if let ThreadMsg::PropagateTransactions { transactions } = rx.recv().unwrap() {
-                    tokio::spawn(async move {
-                        let client = client.lock().await;
-                        client.add_transactions(transactions).await.ok();
-                        drop(client)
-                    });
-                }
-            }
-        })
-    });
-
-    tx
-}
-
-/*
- * Create a thread to propagate blocks
- */
-fn create_block_sender() -> Sender<ThreadMsg> {
-    let (tx, rx) = channel();
-    let rx = Arc::new(Mutex::new(rx));
-    thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            loop {
-                let rx = rx.lock().unwrap();
-                if let ThreadMsg::PropagateBlock {
-                    block,
-                    hostname,
-                    rpc_port,
-                } = rx.recv().unwrap()
-                {
-                    tokio::spawn(async move {
-                        let client = RPCClient::new(&format!("http://{}:{}", hostname, rpc_port))
-                            .await
-                            .unwrap();
-                        client.add_block(block).await.ok();
-                    });
-                }
-            }
-        })
-    });
-
-    tx
 }

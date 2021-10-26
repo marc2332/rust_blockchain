@@ -10,7 +10,7 @@ use blockchain::{
     Wallet,
 };
 use chrono::Utc;
-use client::RPCClient;
+use client::NodeClient;
 use futures::Future;
 use node::Node;
 use std::{
@@ -176,7 +176,7 @@ fn create_sender(genesis_wallet: &mut Wallet, i: u16) -> (Transaction, impl Futu
         .build();
 
     let sender = std::thread::spawn(async move || {
-        let client = RPCClient::new_ws(&format!("ws://127.0.0.1:{}", 7000 + i))
+        let client = NodeClient::new_ws(&format!("ws://127.0.0.1:{}", 7000 + i))
             .await
             .unwrap();
 

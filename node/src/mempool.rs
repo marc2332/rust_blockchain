@@ -18,7 +18,7 @@ impl Mempool {
 
         self.cached_transactions.push(transaction.clone());
 
-        if self.cached_transactions.len() >= 2500 {
+        if self.cached_transactions.len() >= 1200 {
             self.cached_transactions.remove(0);
         }
     }
@@ -67,7 +67,7 @@ impl Mempool {
         let mut bad_txs = Vec::new();
 
         for tx in pending_transactions {
-            if ok_txs.len() > 450 {
+            if ok_txs.len() > 700 {
                 break;
             }
 
