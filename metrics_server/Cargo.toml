@@ -1,0 +1,17 @@
+[package]
+name = "metrics_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jsonrpc-derive = "18.0.0"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = "18.0.0"
+jsonrpc-ws-server = "18.0"
+serde_derive = "1.0.126"
+serde = { version = "1.0.127", features = ["derive"] }
+blockchain = { path = "../blockchain"}
+tokio = { version = "1.11.0", features = ["rt-multi-thread", "macros"]}
+warp = "0.3.1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+futures = "0.3.17"
