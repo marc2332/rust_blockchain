@@ -6,5 +6,6 @@ members = [
     "client",
     "discovery_server",
     "blockchain",
-    "explorer"
+    "explorer",
+    "metrics_server"
 ]
