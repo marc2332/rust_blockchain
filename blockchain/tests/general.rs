@@ -41,7 +41,7 @@ fn test() {
             .unwrap();
     }
 
-    for i in 1..5 {
+    for _ in 1..5 {
         blockchain
             .add_block(
                 &BlockBuilder::new()

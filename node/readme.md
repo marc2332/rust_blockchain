@@ -1,18 +1,1 @@
-### TO-DO
-- [x] Reward the block forgers
-- [x] Propagate transactions
-- [x] Remove transactions from the mempool that has been bundled on a propagated block
-- [ ] Prioritize sending transactions to the next block forger
-- [x] Improve the election algorithm
-- [x] Use `enum` instead of `struct` to easily have different types of Transactions inside the blocks 
-- [x] Make the discovery server a library,this way the discovery server could be launched right from the simulation example
-- [ ] Synchronization support
-- [ ] Fees ?
-- [x] Transactions might be duplicated across different blocks if the network latency is too high, it should make sure the transactions  hasn't been already added to a block
-- [x] Scalable block size relative to the network performance
-- [x] Always have just the X last blocks of the blockchain on memory to avoid infinite memory increase
-- [ ] Implement a consensus algorithm to prevent bad nodes to ignore certain transactions
-- [ ] Improve simulation by allowing external nodes to join (this would need to have synchronization support)
-- [x] Fix the never-ending memory usage increase
-- [ ] Discard lost blocks after certain block height to avoid spam.
-- [ ] A metrics module that sends information such as new blocks or new txs, etc... through a WebSockets connection to an external point such as a server that could display this data in a frontend such as website.
+Node implementation in Rust

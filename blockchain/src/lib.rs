@@ -34,5 +34,19 @@ pub use transaction_builder::{
 pub use wallet::Wallet;
 
 pub trait SignVerifier {
+    /// Makes sure the given data was correctly signed by the signature
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let wallet = Wallet::new();
+    /// // Some data
+    /// let data = "Hello World".to_string();
+    /// // The signature that certifies that the wallet signed `Hello World`
+    /// let signature = wallet.sign_data(data.clone());
+    /// // The verification of the signature
+    /// let is_signature_ok = wallet.verify_signature(signature, data);
+    /// ```
+    ///
     fn verify_signature(&self, signature: &Key, data: String) -> bool;
 }

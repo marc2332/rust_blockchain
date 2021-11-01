@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use blockchain::Chainstate;
-
-use crate::Transaction;
-
+use blockchain::{
+    Chainstate,
+    Transaction,
+};
 #[derive(Default, Clone)]
 pub struct Mempool {
     pub pending_transactions: HashMap<String, Transaction>,

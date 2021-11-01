@@ -27,6 +27,7 @@ enum SubscriberMessage {
 }
 
 struct MetricsState {
+    /// Subscribed clients
     pub senders: Vec<Sender<SubscriberMessage>>,
 }
 
@@ -51,6 +52,7 @@ struct RpcManager {
 }
 
 impl RpcMethods for RpcManager {
+    /// Announce that a new block has been added to all subscribed clients
     fn new_block(&self, block: Block) -> RPCResult<()> {
         for sender in &self.state.lock().unwrap().senders {
             sender
@@ -73,9 +75,7 @@ async fn main() {
 
     tokio::task::spawn_blocking(move || {
         let mut ws_io = IoHandler::default();
-        let ws_manager = RpcManager {
-            state: rpc_state.clone(),
-        };
+        let ws_manager = RpcManager { state: rpc_state };
         ws_io.extend_with(ws_manager.to_delegate());
 
         let server = jsonrpc_ws_server::ServerBuilder::new(ws_io)

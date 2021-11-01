@@ -16,13 +16,12 @@ use blockchain::{
     Wallet,
 };
 
-use futures::executor::block_on;
-use jsonrpc_core::{
-    serde_json,
-    IoHandler,
-    Result,
+use client::{
+    HandshakeRequest,
+    NodeClient,
 };
-use jsonrpc_derive::rpc;
+use jsonrpc_core::serde_json;
+
 pub mod mempool;
 pub mod methods;
 pub mod server;
@@ -31,146 +30,42 @@ use jsonrpc_http_server::{
     AccessControlAllowOrigin,
     DomainsValidation,
 };
-use methods::{
-    add_block,
-    get_address_ammount,
-    get_block_with_hash,
-    get_block_with_prev_hash,
-    get_chain_length,
-    get_node_address,
-    make_handshake,
-};
 
-use client::{
-    HandshakeRequest,
-    NodeClient,
-};
-
-use blockchain::Transaction;
 use mempool::Mempool;
 use server::ThreadMsg;
 
-#[rpc]
-pub trait RpcMethods {
-    #[rpc(name = "get_chain_length")]
-    fn get_chain_length(&self) -> Result<(String, usize)>;
-
-    #[rpc(name = "make_handshake")]
-    fn make_handshake(&self, req: HandshakeRequest) -> Result<()>;
-
-    #[rpc(name = "add_transaction")]
-    fn add_transaction(&self, transaction: Transaction) -> Result<()>;
-
-    #[rpc(name = "add_block")]
-    fn add_block(&self, block: Block) -> Result<()>;
-
-    #[rpc(name = "get_block_with_prev_hash")]
-    fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>>;
-
-    #[rpc(name = "get_node_address")]
-    fn get_node_address(&self) -> Result<String>;
-
-    #[rpc(name = "get_address_ammount")]
-    fn get_address_ammount(&self, address: String) -> Result<u64>;
-
-    #[rpc(name = "get_block_with_hash")]
-    fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>>;
-
-    #[rpc(name = "add_transactions")]
-    fn add_transactions(&self, transactions: Vec<Transaction>) -> Result<()>;
-}
-
-struct RpcManager {
-    pub state: Arc<std::sync::Mutex<NodeState>>,
-}
-
-impl RpcMethods for RpcManager {
-    fn get_chain_length(&self) -> Result<(String, usize)> {
-        get_chain_length(&self.state)
-    }
-
-    fn make_handshake(&self, req: HandshakeRequest) -> Result<()> {
-        make_handshake(&self.state, req);
-        Ok(())
-    }
-
-    /*
-     * Handle incoming transactions
-     */
-    fn add_transaction(&self, transaction: Transaction) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
-
-        state.transaction_handlers[state.available_tx_handler]
-            .send(ThreadMsg::AddTransaction(transaction))
-            .unwrap();
-        state.available_tx_handler += 1;
-        if state.available_tx_handler == state.transaction_handlers.len() {
-            state.available_tx_handler = 0;
-        }
-        Ok(())
-    }
-
-    /*
-     * Handle incoming blocks
-     */
-    fn add_block(&self, block: Block) -> Result<()> {
-        let state = self.state.clone();
-        tokio::spawn(async move {
-            add_block(&state, block).await;
-        });
-        Ok(())
-    }
-
-    fn get_block_with_prev_hash(&self, prev_hash: String) -> Result<Option<Block>> {
-        block_on(get_block_with_prev_hash(&self.state, prev_hash))
-    }
-
-    fn get_node_address(&self) -> Result<String> {
-        Ok(get_node_address(&self.state))
-    }
-
-    fn get_address_ammount(&self, address: String) -> Result<u64> {
-        Ok(get_address_ammount(&self.state, address))
-    }
-
-    fn get_block_with_hash(&self, hash: String) -> Result<Option<Block>> {
-        block_on(get_block_with_hash(&self.state, hash))
-    }
-
-    fn add_transactions(&self, transactions: Vec<Transaction>) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
-
-        for tx in transactions {
-            state.transaction_handlers[state.available_tx_handler]
-                .send(ThreadMsg::AddTransaction(tx))
-                .unwrap();
-            state.available_tx_handler += 1;
-            if state.available_tx_handler == state.transaction_handlers.len() {
-                state.available_tx_handler = 0;
-            }
-        }
-
-        Ok(())
-    }
-}
+use crate::server::RpcManager;
 
 #[derive(Clone)]
 pub struct NodeState {
+    /// The chain of blocks
     pub blockchain: Blockchain,
+    /// List of lost blocks
     pub lost_blocks: HashMap<String, Block>,
+    /// Node memory pool
     pub mempool: Mempool,
+    /// Internal Node's wallet
     pub wallet: Wallet,
+    /// Internal Node ID
     pub id: u16,
+    /// Calculated next forger Public Key
     pub next_forger: Option<Key>,
+    /// List of transaction handlers
     pub transaction_handlers: Vec<Sender<ThreadMsg>>,
+    /// Current free transaction handler
     pub available_tx_handler: usize,
+    /// List of transaction senders
     pub transaction_senders: Vec<Sender<ThreadMsg>>,
+    /// List of block senders
     pub block_senders: Vec<Sender<ThreadMsg>>,
+    /// Current free block sender
     pub available_block_sender: usize,
+    /// Known nodes
     pub peers: HashMap<String, (String, u16, u16)>,
 }
 
 impl NodeState {
+    /// Calculate a new block forger given the current state of the blockchain
     pub fn elect_new_forger(&mut self) {
         let next_forger = consensus::elect_forger(&mut self.blockchain).unwrap();
         self.next_forger = Some(next_forger);
@@ -304,11 +199,7 @@ impl Node {
             }
         });
 
-        let mut ws_io = IoHandler::default();
-        let ws_manager = RpcManager {
-            state: self.state.clone(),
-        };
-        ws_io.extend_with(ws_manager.to_delegate());
+        let ws_io = RpcManager::get_io_handler(&self.state);
 
         let ws_hostname = hostname.clone();
 
@@ -326,11 +217,7 @@ impl Node {
             server.wait().unwrap();
         });
 
-        let mut http_io = IoHandler::default();
-        let http_manager = RpcManager {
-            state: self.state.clone(),
-        };
-        http_io.extend_with(http_manager.to_delegate());
+        let http_io = RpcManager::get_io_handler(&self.state);
 
         tokio::task::spawn_blocking(move || {
             let server = jsonrpc_http_server::ServerBuilder::new(http_io)
