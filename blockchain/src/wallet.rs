@@ -1,35 +1,37 @@
-use openssl::{
-    hash::MessageDigest,
-    pkey::{
-        PKey,
-        Private,
-    },
-    rsa::Rsa,
-    sign::{
-        Signer,
-        Verifier,
-    },
-};
-
 use crate::{
     Key,
     SignVerifier,
 };
+use k256::{
+    ecdsa::{
+        recoverable::Signature as RecoverableSignature,
+        signature::{
+            Signature,
+            Signer,
+            Verifier,
+        },
+        Signature as NormalSignature,
+        SigningKey,
+        VerifyingKey,
+    },
+    SecretKey,
+};
+use rand_core::OsRng;
 
-/// A Wallet that holds a pair of keys and it's `history`
+/// A Wallet that holds a private key and it's `history`
 #[derive(Clone)]
 pub struct Wallet {
-    /// The private and public key
-    pub keypair: PKey<Private>,
+    /// The sign key
+    pub sign_key: SigningKey,
     /// The current history of a wallet
     pub history: u64,
 }
 
 impl std::fmt::Debug for Wallet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let key = Key(self.keypair.public_key_to_pem().unwrap());
+        let key = Key(self.sign_key.to_bytes().to_vec());
         f.debug_struct("Wallet")
-            .field("keypair", &key.hash_it())
+            .field("public key", &key.hash_it())
             .field("history", &self.history)
             .finish()
     }
@@ -37,20 +39,19 @@ impl std::fmt::Debug for Wallet {
 
 impl SignVerifier for Wallet {
     fn verify_signature(&self, signature: &Key, data: String) -> bool {
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
-        verifier.update(data.as_bytes()).unwrap();
-        verifier.verify(&signature.0).unwrap()
+        let verify_key = VerifyingKey::from(&self.sign_key);
+        let signature: NormalSignature = NormalSignature::from_bytes(&signature.0).unwrap();
+        verify_key.verify(data.as_bytes(), &signature).is_ok()
     }
 }
 
 impl Wallet {
-    /// Creates a wallet with a random pair of keys
+    /// Creates a random private key
     pub fn new() -> Self {
-        let keypair = Rsa::generate(1024).unwrap();
-        let keypair = PKey::from_rsa(keypair).unwrap();
+        let sign_key = SigningKey::random(&mut OsRng);
 
         Self {
-            keypair,
+            sign_key,
             history: 0,
         }
     }
@@ -67,12 +68,8 @@ impl Wallet {
     ///
     pub fn sign_data(&self, data: String) -> Key {
         let data = data.as_bytes();
-
-        let mut signer = Signer::new(MessageDigest::sha256(), &self.keypair).unwrap();
-        signer.update(data).unwrap();
-        let signature = signer.sign_to_vec().unwrap();
-
-        Key(signature)
+        let signature: RecoverableSignature = self.sign_key.sign(data);
+        Key(signature.as_bytes().to_vec())
     }
 
     /// Returns the public key of the wallet
@@ -87,7 +84,7 @@ impl Wallet {
     /// ```
     ///
     pub fn get_public(&self) -> Key {
-        let public_key = self.keypair.public_key_to_pem().unwrap();
+        let public_key = VerifyingKey::from(&self.sign_key).to_bytes().to_vec();
         Key(public_key)
     }
 
@@ -102,7 +99,7 @@ impl Wallet {
     /// ```
     ///
     pub fn get_private(&self) -> Key {
-        let public_key = self.keypair.private_key_to_pem_pkcs8().unwrap();
+        let public_key = SecretKey::from(&self.sign_key).to_bytes().to_vec();
         Key(public_key)
     }
 
@@ -115,9 +112,9 @@ impl Wallet {
     /// ```
     ///
     pub fn from_private(private_key: &[u8], history: u64) -> Self {
-        let keypair = PKey::private_key_from_pem(private_key).unwrap();
+        let sign_key = SigningKey::from_bytes(private_key).unwrap();
 
-        Self { keypair, history }
+        Self { sign_key, history }
     }
 }
 

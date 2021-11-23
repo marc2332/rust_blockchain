@@ -1,11 +1,9 @@
-use openssl::{
-    hash::MessageDigest,
-    pkey::{
-        PKey,
-        Public,
-    },
-    rsa::Rsa,
-    sign::Verifier,
+use k256::ecdsa::{
+    VerifyingKey,
+    signature::{
+        Signature,
+        Verifier,
+    }
 };
 
 use crate::{
@@ -14,21 +12,36 @@ use crate::{
 };
 
 pub struct PublicAddress {
-    pub keypair: PKey<Public>,
+    pub public_key: VerifyingKey,
+}
+
+impl PublicAddress {
+    pub fn from_signature(signature: &[u8], data: &[u8]) -> Self {
+        let signature: k256::ecdsa::recoverable::Signature =
+            Signature::from_bytes(signature).unwrap();
+        let public_key = signature.recover_verify_key(data).unwrap();
+        Self { public_key }
+    }
+
+    pub fn get_public(&self) -> Key {
+        Key(self.public_key.to_bytes().to_vec())
+    }
 }
 
 impl SignVerifier for PublicAddress {
     fn verify_signature(&self, signature: &Key, data: String) -> bool {
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.keypair).unwrap();
-        verifier.update(data.as_bytes()).unwrap();
-        verifier.verify(&signature.0).unwrap()
+        let signature: k256::ecdsa::recoverable::Signature =
+            Signature::from_bytes(&signature.0).unwrap();
+        let result: Result<(), k256::ecdsa::Error> =
+            self.public_key.verify(data.as_bytes(), &signature);
+        result.is_ok()
     }
 }
 
 impl From<&Key> for PublicAddress {
-    fn from(bytes: &Key) -> Self {
+    fn from(key: &Key) -> Self {
         PublicAddress {
-            keypair: PKey::from_rsa(Rsa::public_key_from_pem(bytes.0.as_slice()).unwrap()).unwrap(),
+            public_key: VerifyingKey::from_sec1_bytes(&key.0).unwrap(),
         }
     }
 }

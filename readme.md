@@ -17,7 +17,6 @@ WIP.
 
 ## Requirements
 - Cargo (nightly toolchain)
-- Openssl
 
 ## Run simulation (WIP)
 Run:

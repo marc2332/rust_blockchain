@@ -98,7 +98,6 @@ impl TransactionBuilder {
                 let wallet = self.wallet.as_ref().unwrap();
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
 
-                hasher.input_str(&self.author_public_key.as_ref().unwrap().to_string());
                 hasher.input_str(self.from_address.as_ref().unwrap());
                 hasher.input_str(self.to_address.as_ref().unwrap());
                 hasher.input_str(&self.ammount.unwrap().to_string());
@@ -108,7 +107,6 @@ impl TransactionBuilder {
                 let signature = wallet.sign_data(hash.clone());
 
                 Transaction::MOVEMENT {
-                    author_public_key: self.author_public_key.as_ref().unwrap().clone(),
                     signature,
                     from_address: self.from_address.as_ref().unwrap().clone(),
                     to_address: self.to_address.as_ref().unwrap().clone(),

@@ -19,7 +19,6 @@ use serde::{
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Transaction {
     MOVEMENT {
-        author_public_key: Key,
         signature: Key,
         from_address: String,
         to_address: String,
@@ -63,7 +62,6 @@ impl Transaction {
     pub fn hash_it(&self) -> String {
         match self {
             Transaction::MOVEMENT {
-                author_public_key,
                 from_address,
                 to_address,
                 ammount,
@@ -71,7 +69,6 @@ impl Transaction {
                 ..
             } => {
                 let mut hasher = Sha3::new(Sha3Mode::Keccak256);
-                hasher.input_str(&author_public_key.to_string());
                 hasher.input_str(from_address);
                 hasher.input_str(to_address);
                 hasher.input_str(&ammount.to_string());
@@ -108,28 +105,26 @@ impl Transaction {
     pub fn verify(&self) -> bool {
         match self {
             Transaction::MOVEMENT {
-                author_public_key,
                 signature,
                 from_address,
                 hash,
                 ..
             } => {
-                let public_key_hashed = author_public_key.hash_it();
-
-                // Ensure the hashed public key is the same as the from_address
-                if &public_key_hashed != from_address {
-                    return false;
-                }
-
                 // Make sure the hash is not altered
                 if &self.hash_it() != hash {
                     return false;
                 }
 
                 // Verify the signature
-                let public_address = PublicAddress::from(author_public_key);
+                let public_address = PublicAddress::from_signature(&signature.0, hash.as_bytes());
 
-                public_address.verify_signature(signature, hash.to_string())
+                let address = public_address.get_public().hash_it();
+
+                if &address != from_address {
+                    return false;
+                }
+
+                true
             }
             Transaction::COINBASE { hash, .. } => {
                 // Make sure the hash is not altered
